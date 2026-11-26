@@ -519,6 +519,10 @@ class AbsenceServiceOptionalWorkforceTest extends TestCase
 	public function testApproveNoOpenRequestRejected(): void
 	{
 		$this->absenceMapper->method('find')->willReturn($this->completedApprovedAbsence());
+		$this->workforcePolicyService->method('isPastCorrectionEnabled')->willReturn(true);
+		$permission = $this->createMock(PermissionService::class);
+		$permission->method('isAdmin')->willReturn(true);
+		$this->injectLazy('correctionPermissionService', $permission);
 		$this->expectExceptionMessage('no_cancel_request');
 		$this->service->approveAbsenceCorrectionRequest(42, [], 'manager1');
 	}
@@ -547,6 +551,9 @@ class AbsenceServiceOptionalWorkforceTest extends TestCase
 		$absence->setEndDate(new \DateTime('+1 day'));
 		$this->absenceMapper->method('find')->willReturn($absence);
 		$this->workforcePolicyService->method('isPastCorrectionEnabled')->willReturn(true);
+		$permission = $this->createMock(PermissionService::class);
+		$permission->method('isAdmin')->willReturn(true);
+		$this->injectLazy('correctionPermissionService', $permission);
 		$this->expectExceptionMessage('not_completed');
 		$this->service->managerCorrectCompletedAbsence(42, [], 'manager1');
 	}
@@ -785,9 +792,21 @@ class AbsenceServiceOptionalWorkforceTest extends TestCase
 		});
 		$this->auditLogMapper->method('logAction');
 
-		// 1440 minutes (boundary) on an 8h day → clamped full-day share.
-		$this->service->createAbsence($this->hourRequest(['duration_minutes' => 1440]), 'employee1');
-		$this->assertSame(1440, $inserted->getDurationMinutes());
+		// 480 minutes on an 8h day (M = P boundary) → full-day share.
+		$this->service->createAbsence($this->hourRequest(['duration_minutes' => 480]), 'employee1');
+		$this->assertSame(480, $inserted->getDurationMinutes());
 		$this->assertSame(1.0, $inserted->getDays());
+	}
+
+	public function testHourModeOverPlannedMinutesRejected(): void
+	{
+		$this->workforcePolicyService->method('isHourlyAbsenceTypeEnabled')->willReturn(true);
+		$this->stubPlannedHours(8.0);
+		$this->teamResolver->method('hasAssignableManagerForEmployee')->willReturn(true);
+		$this->userWorkingTimeModelMapper->method('findCurrentByUser')->willReturn(null);
+		$this->userSettingsMapper->method('getIntegerSetting')->willReturn(25);
+		// §9.2/AC-13: M must be ≤P — 481 > 480 planned is rejected, not clamped.
+		$this->expectExceptionMessage('planned net working time');
+		$this->service->createAbsence($this->hourRequest(['duration_minutes' => 481]), 'employee1');
 	}
 }

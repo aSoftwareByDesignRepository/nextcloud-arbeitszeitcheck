@@ -824,6 +824,17 @@ class TimeEntry extends Entity
 		if ($net === null) {
 			return null;
 		}
+		try {
+			// Clamped window: the entry-scoped paid snapshot can cover breaks
+			// before the earliest counted start — only the in-window share
+			// may be credited.
+			$paid = \OCP\Server::get(BreakPolicyResolver::class)->countedPaidBreakSeconds($this);
+			if ($paid !== null) {
+				return $net + ($paid / 3600);
+			}
+		} catch (\Throwable) {
+			// Resolver unavailable — raw paid semantics.
+		}
 		return $net + $this->getPaidBreakHours();
 	}
 

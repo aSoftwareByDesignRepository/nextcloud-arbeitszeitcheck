@@ -1539,6 +1539,58 @@ class BreakPolicyResolverTest extends TestCase
 		$this->assertSame(0, $this->resolver->countedNetSeconds($entry));
 	}
 
+	public function testCountedPaidBreakSecondsClipsPreThresholdPaidBreak(): void
+	{
+		$this->assignModel([
+			'earliest_counted_start' => '08:00',
+			'breaks_count_as_work' => true,
+		]);
+		// The allocator's snapshot is stored per ENTRY, so it covers every
+		// deductible break — including 06:30–07:00 which sits entirely inside
+		// the clamped-away span. Only the in-window 12:00–12:30 portion may
+		// be credited toward the counted paid duration.
+		$entry = $this->countedEntry('2026-06-15 06:00', '2026-06-15 18:00', [
+			['2026-06-15 06:30', '2026-06-15 07:00'],
+			['2026-06-15 12:00', '2026-06-15 12:30'],
+		]);
+		$entry->setPaidBreakSeconds(3600);
+		$this->assertSame(1800, $this->resolver->countedPaidBreakSeconds($entry));
+	}
+
+	public function testCountedPaidBreakSecondsNullWithoutClamp(): void
+	{
+		$entry = $this->countedEntry('2026-06-15 09:00', '2026-06-15 18:00', [
+			['2026-06-15 12:00', '2026-06-15 12:30'],
+		]);
+		$entry->setPaidBreakSeconds(1800);
+		$this->assertNull($this->resolver->countedPaidBreakSeconds($entry));
+	}
+
+	public function testCountedPaidBreakSecondsCapsAtSnapshot(): void
+	{
+		$this->assignModel([
+			'earliest_counted_start' => '08:00',
+			'breaks_count_as_work' => true,
+		]);
+		// Two in-window deductible breaks (60 min) but the day pool only
+		// granted 30 min — the snapshot caps the credit.
+		$entry = $this->countedEntry('2026-06-15 07:00', '2026-06-15 18:00', [
+			['2026-06-15 12:00', '2026-06-15 12:30'],
+			['2026-06-15 15:00', '2026-06-15 15:30'],
+		]);
+		$entry->setPaidBreakSeconds(1800);
+		$this->assertSame(1800, $this->resolver->countedPaidBreakSeconds($entry));
+	}
+
+	public function testCountedPaidBreakSecondsZeroWhenNothingPaid(): void
+	{
+		$this->assignModel(['earliest_counted_start' => '08:00']);
+		$entry = $this->countedEntry('2026-06-15 06:00', '2026-06-15 18:00', [
+			['2026-06-15 12:00', '2026-06-15 12:30'],
+		]);
+		$this->assertSame(0, $this->resolver->countedPaidBreakSeconds($entry));
+	}
+
 	// --- write-boundary validation ------------------------------------
 
 	public function testValidateModelBreakRulesAcceptsEarlyStartKeys(): void

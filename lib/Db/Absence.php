@@ -373,6 +373,17 @@ class Absence extends Entity
 		// Unknown legacy codes degrade to the raw code + neutral visuals.
 		$type = (string)$this->getType();
 
+		// Timestamps serialize as the stored wall clock with a +00:00 tag:
+		// the naive DATETIME column re-hydrates as UTC, while a just-mutated
+		// entity may carry a storage-TZ datetime (nowInStorage) whose
+		// format('c') would emit +01:00 — a different string for the same
+		// stored value. Emitting wall-clock +00:00 keeps `updatedAt`
+		// byte-identical between mutation responses and later reads, which
+		// optimistic-lock tokens (expectedUpdatedAt) rely on.
+		$isoUtc = static function (?\DateTimeInterface $d): ?string {
+			return $d === null ? null : $d->format('Y-m-d\TH:i:s') . '+00:00';
+		};
+
 		return [
 			'id' => $this->getId(),
 			'userId' => $this->getUserId(),
@@ -396,16 +407,16 @@ class Absence extends Entity
 			'approverComment' => $this->getApproverComment(),
 			'approvedBy' => $this->getApprovedBy(),
 			'approvedByUserId' => $this->getApprovedByUserId(),
-			'approvedAt' => $this->getApprovedAt()?->format('c'),
-			'createdAt' => $createdAt ? $createdAt->format('c') : null,
-			'updatedAt' => $updatedAt ? $updatedAt->format('c') : null,
+			'approvedAt' => $isoUtc($this->getApprovedAt()),
+			'createdAt' => $isoUtc($createdAt),
+			'updatedAt' => $isoUtc($updatedAt),
 			'substituteUserId' => $this->getSubstituteUserId(),
 			'isPast' => $isPast,
 			'isCurrent' => $isCurrent,
 			'isFuture' => $isFuture,
 			'isManagerRecorded' => $isManagerRecorded,
 			'cancelRequested' => $this->getCancelRequestedAt() !== null,
-			'cancelRequestedAt' => $this->getCancelRequestedAt()?->format('c'),
+			'cancelRequestedAt' => $isoUtc($this->getCancelRequestedAt()),
 			'cancelRequestedBy' => $this->getCancelRequestedBy(),
 			'cancelRequestReason' => $this->getCancelReason(),
 		];

@@ -276,28 +276,32 @@ class AdminVacationYearAckBehaviorTest extends TestCase
 			'vacationYearMode' => Constants::VACATION_YEAR_MODE_ANNIVERSARY,
 			'vacationYearMissingHireAcknowledged' => true,
 		]);
-		$this->auditLogMapper->expects($this->once())
-			->method('logAction')
-			->with(
-				$this->anything(),
-				'vacation_year_mode_changed',
-				'app_config',
-				0,
-				['vacation_year_mode' => Constants::VACATION_YEAR_MODE_CALENDAR],
-				$this->callback(static function (array $new): bool {
-					return ($new['vacation_year_mode'] ?? null) === Constants::VACATION_YEAR_MODE_ANNIVERSARY
-						&& ($new['missing_hire_count'] ?? null) === 1
-						&& ($new['missing_hire_acknowledged'] ?? null) === true
-						&& array_key_exists('allocations_refreshed', $new)
-						&& array_key_exists('allocations_failed_count', $new);
-				}),
-				$this->anything()
-			);
+		// The shared settings form posts the HR section alongside the
+		// vacation-year flip, so two audit rows are written:
+		// vacation_year_mode_changed + hr_notification_settings_changed.
+		$actions = [];
+		$this->auditLogMapper->method('logAction')
+			->willReturnCallback(function (...$args) use (&$actions) {
+				$actions[] = $args;
+				return new \OCA\ArbeitszeitCheck\Db\AuditLog();
+			});
 
 		$response = $this->controller->updateNotificationSettings();
 		$data = $response->getData();
 		$this->assertTrue($data['success'], 'Response: ' . json_encode($data));
 		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+
+		$this->assertCount(2, $actions);
+		$this->assertSame('vacation_year_mode_changed', $actions[0][1]);
+		$this->assertSame('app_config', $actions[0][2]);
+		$this->assertSame(['vacation_year_mode' => Constants::VACATION_YEAR_MODE_CALENDAR], $actions[0][4]);
+		$new = $actions[0][5];
+		$this->assertSame(Constants::VACATION_YEAR_MODE_ANNIVERSARY, $new['vacation_year_mode']);
+		$this->assertSame(1, $new['missing_hire_count']);
+		$this->assertTrue($new['missing_hire_acknowledged']);
+		$this->assertArrayHasKey('allocations_refreshed', $new);
+		$this->assertArrayHasKey('allocations_failed_count', $new);
+		$this->assertSame('hr_notification_settings_changed', $actions[1][1]);
 		$this->assertSame(Constants::VACATION_YEAR_MODE_ANNIVERSARY, $data['vacationYearModeFlip']['to'] ?? null);
 		$this->assertArrayHasKey('allocationsRefreshed', $data['vacationYearModeFlip']);
 	}

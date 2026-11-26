@@ -739,6 +739,26 @@ class AdminControllerTest extends TestCase
 		$this->assertTrue($matrix['vacation']['request_created']);
 	}
 
+	public function testUpdateNotificationSettingsAuditsHrConfigWrite(): void
+	{
+		$this->request->method('getParams')->willReturn([
+			'enabled' => true,
+			'recipients' => ['hr@example.com'],
+			'matrix' => ['vacation' => ['request_created' => true]],
+		]);
+		$this->appConfig->method('setAppValueString')->willReturn(true);
+		$this->appConfig->method('getAppValueString')->willReturn('');
+
+		// HR recipient/matrix writes redirect personal absence data by mail —
+		// they must leave an audit row like every other privileged write.
+		$this->auditLogMapper->expects($this->once())
+			->method('logAction')
+			->with($this->anything(), 'hr_notification_settings_changed', 'app_config');
+
+		$response = $this->controller->updateNotificationSettings();
+		$this->assertTrue($response->getData()['success']);
+	}
+
 	public function testUpdateNotificationSettingsPersistsNormalizedValues(): void
 	{
 		$this->request->method('getParams')->willReturn([
@@ -5717,5 +5737,24 @@ class AdminControllerTest extends TestCase
 		$response = $this->controller->workingTimeModelSplitPreview();
 		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
 		$this->assertFalse($response->getData()['success']);
+	}
+
+	/**
+	 * Every event key declared in Constants::HR_NOTIFICATION_EVENTS must have
+	 * a matrix checkbox in the admin UI — and vice versa. A fired event with
+	 * no row (manager_cancelled) is unreachable; a row with no fire site
+	 * (employee_shortened) is a dead checkbox. This parity check is the
+	 * contract guard for both directions.
+	 */
+	public function testHrEventTypesMatchDeclaredNotificationEvents(): void
+	{
+		$m = new \ReflectionMethod(AdminController::class, 'getNotificationEventTypes');
+		$m->setAccessible(true);
+		$types = $m->invoke($this->controller);
+		$keys = array_column($types, 'key');
+		sort($keys);
+		$expected = Constants::HR_NOTIFICATION_EVENTS;
+		sort($expected);
+		$this->assertSame($expected, $keys);
 	}
 }

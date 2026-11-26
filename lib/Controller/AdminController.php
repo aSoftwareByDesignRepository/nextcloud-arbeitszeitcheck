@@ -3655,7 +3655,7 @@ class AdminController extends Controller
 				'absenceTypes' => $this->getNotificationAbsenceTypes(),
 				'eventTypes' => $this->getNotificationEventTypes(),
 			]);
-		} catch (\Throwable) {
+		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::getNotificationSettings failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
@@ -4577,6 +4577,23 @@ class AdminController extends Controller
 				if ($hrWrite['writeMatrix']) {
 					$this->appConfig->setAppValueString(Constants::CONFIG_HR_NOTIFICATION_MATRIX_V1, (string)json_encode($hrWrite['matrix']));
 				}
+				// Recipient changes redirect personal absence data by mail —
+				// they must leave an audit trail like every other privileged
+				// app_config write in this method.
+				$this->auditLogMapper->logAction(
+					$this->getPerformedBy(),
+					'hr_notification_settings_changed',
+					'app_config',
+					null,
+					null,
+					[
+						'enabled' => $hrWrite['writeEnabled'] ? $hrWrite['enabled'] : null,
+						'recipients_written' => $hrWrite['writeRecipients'],
+						'recipients_count' => $hrWrite['writeRecipients'] ? count($hrWrite['recipients']) : null,
+						'matrix_written' => $hrWrite['writeMatrix'],
+					],
+					$this->getPerformedBy()
+				);
 			}
 
 			if ($trafficWrite !== null) {
@@ -4824,7 +4841,7 @@ class AdminController extends Controller
 					}
 				}
 			}
-		} catch (\Throwable) {
+		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::updateNotificationSettings failed: ' . $e->getMessage(), ['exception' => $e]);
 			return new JSONResponse([
 				'success' => false,
@@ -5601,6 +5618,7 @@ class AdminController extends Controller
 			['key' => 'manager_rejected', 'label' => $this->l10n->t('Manager rejected')],
 			['key' => 'employee_cancelled', 'label' => $this->l10n->t('Employee cancelled')],
 			['key' => 'employee_shortened', 'label' => $this->l10n->t('Employee shortened')],
+			['key' => 'manager_cancelled', 'label' => $this->l10n->t('Manager cancelled')],
 		];
 	}
 

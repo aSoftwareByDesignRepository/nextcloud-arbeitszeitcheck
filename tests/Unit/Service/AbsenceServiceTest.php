@@ -2166,6 +2166,26 @@ class AbsenceServiceTest extends TestCase
 	}
 
 	/**
+	 * HR matrix row `employee_shortened` is configurable in the admin UI but
+	 * was never fired — the matrix checkbox was a dead control. The shorten
+	 * path must emit the event post-commit, exactly like `employee_cancelled`.
+	 */
+	public function testShortenAbsenceFiresHrOfficeEmployeeShortened(): void
+	{
+		$absence = $this->makeAbsenceRow(25, 'alice', Absence::STATUS_APPROVED, Absence::TYPE_PERSONAL_LEAVE, '-5 days', '+9 days');
+		$this->absenceMapper->method('find')->willReturn($absence);
+		$this->absenceMapper->method('update')->willReturnCallback(static fn (Absence $a) => $a);
+
+		$mail = $this->createMock(AbsenceNotificationMailService::class);
+		$mail->expects($this->once())
+			->method('sendHrOfficeNotification')
+			->with($this->isInstanceOf(Absence::class), 'employee_shortened', 'alice');
+
+		$service = $this->rebuildService($this->absenceMapper, $mail);
+		$service->shortenAbsence(25, 'alice', (new \DateTime('+3 days'))->format('Y-m-d'));
+	}
+
+	/**
 	 * Regression: shortenAbsence must pass a defined request payload to
 	 * adjustConsumedAbsence — with the SE service wired (production path),
 	 * an undefined $data arg threw a TypeError that escaped as a generic 500.
@@ -2267,7 +2287,7 @@ class AbsenceServiceTest extends TestCase
 		return $m;
 	}
 
-	private function rebuildService(AbsenceMapper $mapper): AbsenceService
+	private function rebuildService(AbsenceMapper $mapper, ?AbsenceNotificationMailService $mailService = null): AbsenceService
 	{
 		return new AbsenceService(
 			$mapper,
@@ -2285,7 +2305,7 @@ class AbsenceServiceTest extends TestCase
 			$this->holidayCalendarService,
 			$this->vacationYearBalanceMapper,
 			$this->vacationAllocationService,
-			null,
+			$mailService,
 			$this->monthClosureService
 		);
 	}

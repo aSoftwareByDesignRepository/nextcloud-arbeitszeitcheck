@@ -273,10 +273,11 @@ final class AbsenceDayShape
 	/**
 	 * Hour-mode aware variant of {@see coversCompatible()} (optional
 	 * workforce spec §9.2/§15.9). Hour-mode covers carry the pseudo-slot
-	 * 'hours': they have no clock interval, so the only provable legality
-	 * bound is the share-of-day sum — every 'hours' cover adds its fraction
-	 * while am/pm slot covers still need strict distinctness. Covers that
-	 * claim a full day (fraction ≥ 1) can never share the day.
+	 * 'hours': §9.2 requires one active absence per date where an hour-mode
+	 * request is involved, so any 'hours' cover is incompatible with every
+	 * other cover — it can never share the day. am/pm slot covers still
+	 * need strict distinctness and covers that claim a full day
+	 * (fraction ≥ 1) can never share the day either.
 	 *
 	 * Day-mode callers see identical outcomes: without 'hours' covers the
 	 * rules reduce to the legacy predicate.
@@ -292,10 +293,10 @@ final class AbsenceDayShape
 				return false;
 			}
 			if ($slot === 'hours') {
-				// Slotless additive share — multiple hour covers may coexist
-				// as long as their combined claim stays within the day.
-				$sum += max(0.0, min(1.0, $fraction));
-				continue;
+				// §9.2: one active absence per date where an hour-mode
+				// request is involved — an 'hours' cover coexisting with
+				// any other cover is a conflict, in both directions.
+				return count($covers) === 1;
 			}
 			if ($fraction >= 1.0 - self::EPS) {
 				return false;

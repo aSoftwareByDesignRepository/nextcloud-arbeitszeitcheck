@@ -1102,6 +1102,41 @@ final class BreakPolicyResolver
 	}
 
 	/**
+	 * Paid-break credit for the counted window (spec B). The allocator's
+	 * snapshot is stored per ENTRY and covers every deductible break — so a
+	 * break that sits entirely before the earliest counted start must not be
+	 * credited toward the counted paid duration. Returns null when no clamp
+	 * applies so callers keep the raw snapshot semantics.
+	 */
+	public function countedPaidBreakSeconds(TimeEntry $entry): ?int
+	{
+		$threshold = $this->countedStartForEntry($entry);
+		if ($threshold === null) {
+			return null;
+		}
+		$paid = $entry->getPaidBreakSeconds();
+		if ($paid <= 0) {
+			return 0;
+		}
+		$end = $entry->getEndTime();
+		$endTs = $end?->getTimestamp() ?? $threshold;
+		if ($endTs <= $threshold) {
+			return 0;
+		}
+		// Mirror PaidBreakAllocator::allocateDay — floor-filter portions
+		// before merging — then cap the credit at the recorded snapshot.
+		$floorSeconds = max(0, $entry->resolveCountableMinBreakMinutes()) * 60;
+		$filtered = [];
+		foreach ($this->entryBreakIntervals($entry, $threshold, $endTs) as $piece) {
+			if ($floorSeconds > 0 && ($piece['end'] - $piece['start']) < $floorSeconds) {
+				continue;
+			}
+			$filtered[] = [$piece['start'], $piece['end']];
+		}
+		return min($paid, $this->intervalSeconds($this->mergeIntervals($filtered)));
+	}
+
+	/**
 	 * Like {@see localTimeToTs} but for the counted-start threshold (B-R6):
 	 * a configured wall-clock time that does not exist on $day (DST
 	 * spring-forward) resolves to the first valid local time at-or-after it.

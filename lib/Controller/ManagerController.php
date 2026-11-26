@@ -3965,6 +3965,8 @@ class ManagerController extends Controller
 				$absence = $this->absenceService->approveAbsence($absenceId, $managerId, $comment);
 			} catch (ConcurrentDecisionException $e) {
 				return new JSONResponse($e->toHttpPayload(), Http::STATUS_CONFLICT);
+			} catch (BusinessRuleException $e) {
+				return new JSONResponse($e->toHttpPayload(), Http::STATUS_BAD_REQUEST);
 			} catch (\OCP\Lock\LockedException $e) {
 				return new JSONResponse([
 					'success' => false,

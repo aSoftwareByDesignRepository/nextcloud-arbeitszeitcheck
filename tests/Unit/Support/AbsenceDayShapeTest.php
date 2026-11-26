@@ -176,6 +176,35 @@ class AbsenceDayShapeTest extends TestCase
 		]));
 	}
 
+	// ---- coversCompatibleHourAware -----------------------------------------
+
+	public function testHourCoverCannotShareWithHourCover(): void
+	{
+		// §9.2: one active absence per date where an hour-mode request is
+		// involved — two partial hour shares never coexist, even when their
+		// combined claim would stay inside the day.
+		$this->assertFalse(AbsenceDayShape::coversCompatibleHourAware([
+			[0.25, 'hours'], [0.125, 'hours'],
+		]));
+	}
+
+	public function testHourCoverCannotShareWithSlotCover(): void
+	{
+		$this->assertFalse(AbsenceDayShape::coversCompatibleHourAware([
+			[0.5, 'am'], [0.25, 'hours'],
+		]));
+		$this->assertFalse(AbsenceDayShape::coversCompatibleHourAware([
+			[0.25, 'hours'], [0.5, 'am'],
+		]));
+	}
+
+	public function testHourCoverAloneStaysCompatible(): void
+	{
+		$this->assertTrue(AbsenceDayShape::coversCompatibleHourAware([
+			[0.25, 'hours'],
+		]));
+	}
+
 	// ---- debitForShape -----------------------------------------------------
 
 	public function testDebitSingleDayHalfWeightRelative(): void

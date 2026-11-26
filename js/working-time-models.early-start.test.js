@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 /**
  * Earliest counted start (spec B): optional per-model clamp of the counted
  * work start. The editor collects earliest_counted_start + early_start_mode
- * + early_start_anchor into break_rules, deletes the keys on empty input,
- * validates HH:MM client-side, and toggles the mode group + DST hint.
+ * + early_start_anchor into break_rules, sends explicit nulls on empty
+ * input (absent keys are preserved server-side — B-R8, so a missing key can
+ * never clear), validates HH:MM client-side, and toggles the mode group +
+ * DST hint.
  */
 
 const T = () => window.__ArbeitszeitCheckWorkingTimeModelsTestables
@@ -78,7 +80,7 @@ describe('buildBreakRulesPayload early-start keys', () => {
     expect(payload.early_start_anchor).toBe('calendar_day')
   })
 
-  it('deletes the keys on empty input (explicit clear)', () => {
+  it('sends explicit nulls on empty input (explicit clear — absent keys are preserved server-side)', () => {
     const host = mountPanel('edit', {
       id: 7,
       name: 'shift',
@@ -98,9 +100,12 @@ describe('buildBreakRulesPayload early-start keys', () => {
       early_start_anchor: 'calendar_day',
     })
     expect(payload.error).toBeUndefined()
-    expect('earliest_counted_start' in payload).toBe(false)
-    expect('early_start_mode' in payload).toBe(false)
-    expect('early_start_anchor' in payload).toBe(false)
+    // Server contract (B-R8): keys absent from breakRules keep their stored
+    // value — an explicit clear must send null/'' so the write boundary
+    // treats it as a deliberate removal, not an omission.
+    expect(payload.earliest_counted_start).toBeNull()
+    expect(payload.early_start_mode).toBeNull()
+    expect(payload.early_start_anchor).toBeNull()
   })
 
   it('defaults early_start_mode to clamp when the select is untouched', () => {

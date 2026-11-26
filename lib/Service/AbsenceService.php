@@ -1226,12 +1226,16 @@ class AbsenceService
 				$this->db->rollBack();
 				throw $e;
 			}
-
-			return $updatedAbsence;
 		} finally {
 			$this->releaseMonthClosureLocks($monthClosureKeys);
 			$this->releaseUserMutationLock($lockKey);
 		}
+
+		if ($this->absenceNotificationMailService) {
+			$this->runPostCommitEffect(fn () => $this->absenceNotificationMailService?->sendHrOfficeNotification($updatedAbsence, 'employee_shortened', $userId));
+		}
+
+		return $updatedAbsence;
 	}
 
 	/**
@@ -1278,6 +1282,28 @@ class AbsenceService
 			}
 			// Re-assert under the month-closure locks.
 			$this->assertAbsenceMutable($absence);
+
+			// §9.3/AC-13: approval validates the same hour-mode rules as
+			// creation/edit — the policy may have been disabled or the plan
+			// may have shrunk below M since the request was filed.
+			if ($this->isHourModeAbsence($absence)) {
+				$hourType = (string)$absence->getType();
+				$policy = $this->workforcePolicyService ?? \OCP\Server::get(WorkforcePolicyService::class);
+				if (!$policy->isHourlyAbsenceTypeEnabled($hourType)) {
+					throw new BusinessRuleException(
+						$this->l10n->t('Your organization has not enabled hour requests for this absence type.'),
+						WorkforcePolicyService::ERROR_DISABLED
+					);
+				}
+				$sd = $absence->getStartDate();
+				$hourPlannedMin = $sd !== null ? $this->plannedMinutesForDay($absence->getUserId(), $sd) : 0;
+				if ($hourPlannedMin <= 0 || (int)$absence->getDurationMinutes() > $hourPlannedMin) {
+					throw new BusinessRuleException(
+						$this->l10n->t('Enter a whole number of minutes between 1 and the planned net working time.'),
+						'HOURLY_DURATION_INVALID'
+					);
+				}
+			}
 
 			if ($absence->getType() === Absence::TYPE_VACATION) {
 				$sd = $absence->getStartDate();
@@ -2854,10 +2880,19 @@ class AbsenceService
 		// An hour request on a day with no planned time covers nothing — for
 		// unpaid leave there is no Soll to reduce, for comp there is no day
 		// to take off. Refuse instead of storing a zero-effect row.
-		if ($this->plannedMinutesForDay($userId, $startDate) <= 0) {
+		$plannedMin = $this->plannedMinutesForDay($userId, $startDate);
+		if ($plannedMin <= 0) {
 			throw new BusinessRuleException(
 				$this->l10n->t('The selected day has no planned working time.'),
 				'NO_PLANNED_TIME'
+			);
+		}
+		// §9.2/AC-13: M must be ≤P — reject, never silently clamp the day
+		// share to 1.0 while storing an oversized authoritative minute count.
+		if ($minutes > $plannedMin) {
+			throw new BusinessRuleException(
+				$this->l10n->t('Enter a whole number of minutes between 1 and the planned net working time.'),
+				'HOURLY_DURATION_INVALID'
 			);
 		}
 		return $minutes;
@@ -4722,6 +4757,21 @@ class AbsenceService
 	 * UUID operation identity is mandatory for every new correction/hour
 	 * command (§15.9) — 8-4-4-4-12 hex, ≤64 chars.
 	 */
+	/**
+	 * Non-throwing variant of {@see requireOperationKey}: returns the key only
+	 * when it is well-formed, else null — so an early replay lookup can run
+	 * for honest retries while malformed input keeps the original guard
+	 * order and still errors via requireOperationKey at its old position.
+	 */
+	private function operationKeyOrNull(array $data): ?string
+	{
+		try {
+			return $this->requireOperationKey($data);
+		} catch (\Exception) {
+			return null;
+		}
+	}
+
 	private function requireOperationKey(array $data): string
 	{
 		$key = trim((string)($data['operation_key'] ?? $data['operationKey'] ?? ''));
@@ -4838,6 +4888,20 @@ class AbsenceService
 			throw new \Exception('feature_disabled');
 		}
 		$ownerUserId = $absence->getUserId();
+		// §15.9: an idempotent retry must return the stored receipt before the
+		// state guards run — the successful operation moved the state (pending
+		// flag, updatedAt, later even status), so guarding first would wedge
+		// every honest retry behind cancel_request_pending / revision_stale.
+		// Only a well-formed key can own a receipt; malformed input keeps the
+		// original guard order and still fails at requireOperationKey below.
+		$operationKey = $this->operationKeyOrNull($data);
+		$digest = '';
+		if ($operationKey !== null) {
+			$digest = $this->correctionRequestDigest('correction_request', $absenceId, $data, $actorUserId);
+			if (($stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId)) !== null) {
+				return $stored;
+			}
+		}
 		if ($absence->getStatus() !== Absence::STATUS_APPROVED || !$this->isCompletedAbsence($absence)) {
 			throw new \Exception('not_completed');
 		}
@@ -4854,10 +4918,9 @@ class AbsenceService
 			throw new \Exception('revision_stale');
 		}
 		$this->assertAbsenceMutable($absence);
-		$operationKey = $this->requireOperationKey($data);
-		$digest = $this->correctionRequestDigest('correction_request', $absenceId, $data, $actorUserId);
-		if (($stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId)) !== null) {
-			return $stored;
+		if ($operationKey === null) {
+			$operationKey = $this->requireOperationKey($data);
+			$digest = $this->correctionRequestDigest('correction_request', $absenceId, $data, $actorUserId);
 		}
 		$start = $absence->getStartDate();
 		$end = $absence->getEndDate();
@@ -4946,6 +5009,17 @@ class AbsenceService
 			throw new DoesNotExistException($this->l10n->t('Absence not found'));
 		}
 		$ownerUserId = $absence->getUserId();
+		// §15.9: replay before the state guards — after a successful withdraw
+		// the cancel flags are cleared, so a retry must answer with the
+		// stored receipt, not no_cancel_request / revision_stale.
+		$operationKey = $this->operationKeyOrNull($data);
+		$digest = '';
+		if ($operationKey !== null) {
+			$digest = $this->correctionRequestDigest('correction_withdraw', $absenceId, $data, $actorUserId);
+			if (($stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId)) !== null) {
+				return $stored;
+			}
+		}
 		if ($absence->getCancelRequestedAt() === null || !$this->isCompletedAbsence($absence)) {
 			throw new \Exception('no_cancel_request');
 		}
@@ -4954,10 +5028,9 @@ class AbsenceService
 		if ($expected === '' || $expected !== $actualUpdatedAt) {
 			throw new \Exception('revision_stale');
 		}
-		$operationKey = $this->requireOperationKey($data);
-		$digest = $this->correctionRequestDigest('correction_withdraw', $absenceId, $data, $actorUserId);
-		if (($stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId)) !== null) {
-			return $stored;
+		if ($operationKey === null) {
+			$operationKey = $this->requireOperationKey($data);
+			$digest = $this->correctionRequestDigest('correction_withdraw', $absenceId, $data, $actorUserId);
 		}
 
 		$lockKey = $this->acquireUserMutationLock($ownerUserId);
@@ -5015,15 +5088,26 @@ class AbsenceService
 	public function approveAbsenceCorrectionRequest(int $absenceId, array $data, string $actorUserId): Absence|array
 	{
 		$absence = $this->absenceMapper->find($absenceId);
-		$requestMeta = $this->assertOpenCancelRequest($absence);
 		if (!$this->workforcePolicy()->isPastCorrectionEnabled()) {
 			throw new \Exception('feature_disabled');
 		}
 		$ownerUserId = $absence->getUserId();
+		$this->assertCorrectionActorAuthorized($actorUserId, $ownerUserId);
+		// §15.9: replay before the open-request/state guards — a decided
+		// request has no open flags anymore, so an honest retry must return
+		// the stored receipt instead of no_cancel_request / revision_stale.
+		$operationKey = $this->operationKeyOrNull($data);
+		$digest = '';
+		if ($operationKey !== null) {
+			$digest = $this->correctionRequestDigest('correction_approve', $absenceId, $data, $actorUserId);
+			if (($stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId)) !== null) {
+				return $stored;
+			}
+		}
+		$requestMeta = $this->assertOpenCancelRequest($absence);
 		if ($absence->getStatus() !== Absence::STATUS_APPROVED || !$this->isCompletedAbsence($absence)) {
 			throw new \Exception('not_completed');
 		}
-		$this->assertCorrectionActorAuthorized($actorUserId, $ownerUserId);
 		$expected = trim((string)($data['expectedUpdatedAt'] ?? ''));
 		$actualUpdatedAt = $absence->getUpdatedAt() ? $absence->getUpdatedAt()->format('c') : '';
 		if ($expected === '' || $expected !== $actualUpdatedAt) {
@@ -5033,10 +5117,9 @@ class AbsenceService
 		if ($absence->getType() === Absence::TYPE_VACATION) {
 			$this->assertVacationUnitMigrationIdle();
 		}
-		$operationKey = $this->requireOperationKey($data);
-		$digest = $this->correctionRequestDigest('correction_approve', $absenceId, $data, $actorUserId);
-		if (($stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId)) !== null) {
-			return $stored;
+		if ($operationKey === null) {
+			$operationKey = $this->requireOperationKey($data);
+			$digest = $this->correctionRequestDigest('correction_approve', $absenceId, $data, $actorUserId);
 		}
 		$reason = (string)($absence->getCancelReason() ?? '');
 		try {
@@ -5068,15 +5151,26 @@ class AbsenceService
 	public function declineAbsenceCorrectionRequest(int $absenceId, array $data, string $actorUserId): Absence|array
 	{
 		$absence = $this->absenceMapper->find($absenceId);
-		$this->assertOpenCancelRequest($absence);
 		if (!$this->workforcePolicy()->isPastCorrectionEnabled()) {
 			throw new \Exception('feature_disabled');
 		}
 		$ownerUserId = $absence->getUserId();
+		$this->assertCorrectionActorAuthorized($actorUserId, $ownerUserId);
+		// §15.9: replay before the open-request/state guards — a decided
+		// request has no open flags anymore, so an honest retry must return
+		// the stored receipt instead of no_cancel_request / revision_stale.
+		$operationKey = $this->operationKeyOrNull($data);
+		$digest = '';
+		if ($operationKey !== null) {
+			$digest = $this->correctionRequestDigest('correction_decline', $absenceId, $data, $actorUserId);
+			if (($stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId)) !== null) {
+				return $stored;
+			}
+		}
+		$this->assertOpenCancelRequest($absence);
 		if (!$this->isCompletedAbsence($absence)) {
 			throw new \Exception('not_completed');
 		}
-		$this->assertCorrectionActorAuthorized($actorUserId, $ownerUserId);
 		$comment = trim((string)($data['comment'] ?? ''));
 		if (mb_strlen($comment) > 500) {
 			throw new \Exception('reason_too_long');
@@ -5086,10 +5180,9 @@ class AbsenceService
 		if ($expected === '' || $expected !== $actualUpdatedAt) {
 			throw new \Exception('revision_stale');
 		}
-		$operationKey = $this->requireOperationKey($data);
-		$digest = $this->correctionRequestDigest('correction_decline', $absenceId, $data, $actorUserId);
-		if (($stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId)) !== null) {
-			return $stored;
+		if ($operationKey === null) {
+			$operationKey = $this->requireOperationKey($data);
+			$digest = $this->correctionRequestDigest('correction_decline', $absenceId, $data, $actorUserId);
 		}
 
 		$lockKey = $this->acquireUserMutationLock($ownerUserId);
@@ -5163,10 +5256,21 @@ class AbsenceService
 			throw new \Exception('feature_disabled');
 		}
 		$ownerUserId = $absence->getUserId();
+		$this->assertCorrectionActorAuthorized($actorUserId, $ownerUserId);
+		// §15.9: replay before the state guards — a completed direct
+		// correction already changed status/updatedAt, so a retry must
+		// return the stored receipt instead of not_completed / revision_stale.
+		$operationKey = $this->operationKeyOrNull($data);
+		$digest = '';
+		if ($operationKey !== null) {
+			$digest = $this->correctionRequestDigest('correction_direct', $absenceId, $data, $actorUserId);
+			if (($stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId)) !== null) {
+				return $stored;
+			}
+		}
 		if ($absence->getStatus() !== Absence::STATUS_APPROVED || !$this->isCompletedAbsence($absence)) {
 			throw new \Exception('not_completed');
 		}
-		$this->assertCorrectionActorAuthorized($actorUserId, $ownerUserId);
 		$reason = trim((string)($data['reason'] ?? ''));
 		if ($reason === '' || mb_strlen($reason) > 500) {
 			throw new \Exception('reason_required');
@@ -5180,10 +5284,9 @@ class AbsenceService
 		if ($absence->getType() === Absence::TYPE_VACATION) {
 			$this->assertVacationUnitMigrationIdle();
 		}
-		$operationKey = $this->requireOperationKey($data);
-		$digest = $this->correctionRequestDigest('correction_direct', $absenceId, $data, $actorUserId);
-		if (($stored = $this->replayOperationReceipt($operationKey, $digest, $actorUserId)) !== null) {
-			return $stored;
+		if ($operationKey === null) {
+			$operationKey = $this->requireOperationKey($data);
+			$digest = $this->correctionRequestDigest('correction_direct', $absenceId, $data, $actorUserId);
 		}
 		try {
 			return $this->writeManagerCancellation(

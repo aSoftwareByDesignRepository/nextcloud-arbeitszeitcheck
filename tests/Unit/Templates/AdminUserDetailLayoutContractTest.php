@@ -262,7 +262,13 @@ class AdminUserDetailLayoutContractTest extends TestCase
 			$css,
 		);
 		$this->assertMatchesRegularExpression(
-			'/#app-content\.azc-app--admin-user-detail \.admin-user-detail__actions\s*\{[^}]*position:\s*sticky;[^}]*bottom:\s*0;[^}]*margin:\s*0 calc\(-1 \* var\(--azc-space-5, 24px\)\) 0;[^}]*width:\s*auto;[^}]*border-left:\s*0;[^}]*border-right:\s*0;[^}]*border-bottom:\s*0;/s',
+			'/#app-content\.azc-app--admin-user-detail \.admin-user-detail__actions\s*\{[^}]*position:\s*sticky;[^}]*bottom:\s*0;[^}]*margin:\s*0;[^}]*width:\s*auto;[^}]*border-left:\s*0;[^}]*border-right:\s*0;[^}]*border-bottom:\s*0;/s',
+			$css,
+		);
+		// 607f136a: the negative-margin bleed pushed the bar's right edge past
+		// main's border box (+24px overflow @375px) — it must never come back.
+		$this->assertDoesNotMatchRegularExpression(
+			'/\.admin-user-detail__actions\s*\{[^}]*margin:[^;]*calc\(-1 \* var\(--azc-space-5/s',
 			$css,
 		);
 		$this->assertMatchesRegularExpression(

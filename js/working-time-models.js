@@ -837,14 +837,16 @@
             delete base.breaks_count_as_work;
             delete base.paid_break_cap_minutes;
         }
-        // Counted-start clamp (spec B): empty = off — delete the keys so an
-        // explicit clear persists. Set → write all three keys; the anchor is
-        // fixed to calendar_day until Phase 2 lands a shift source.
+        // Counted-start clamp (spec B): empty = off — send explicit nulls so
+        // the clear persists. Absent keys are preserved server-side (B-R8),
+        // so deleting the keys here would silently resurrect the old clamp.
+        // Set → write all three keys; the anchor is fixed to calendar_day
+        // until Phase 2 lands a shift source.
         const earliestCountedRaw = String(form.querySelector('#wtm-model-earliest-counted-start')?.value || '').trim();
         if (earliestCountedRaw === '') {
-            delete base.earliest_counted_start;
-            delete base.early_start_mode;
-            delete base.early_start_anchor;
+            base.earliest_counted_start = null;
+            base.early_start_mode = null;
+            base.early_start_anchor = null;
         } else if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(earliestCountedRaw)) {
             return {
                 error: wtmMsg('earliestCountedStartInvalid', 'Earliest counted start must be a clock time (HH:MM) or empty.'),

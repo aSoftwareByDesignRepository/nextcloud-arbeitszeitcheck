@@ -711,6 +711,22 @@ final class TransferHooks implements ConfigTransferHooks
 		// normalizer keeps every catalog type (incl. inactive for retention)
 		// and drops unknown/injected codes fail-closed.
 		$matrix = AbsenceTypeCatalog::normalizeEventMatrix($input, Constants::HR_NOTIFICATION_EVENTS);
+		// Transfer ordering: applyConfigPlan runs BEFORE applyTablePlan, so a
+		// custom type imported by the same package is not in the target
+		// catalog yet and its row would drop here. Preserve custom_* input
+		// rows verbatim — the send-side stays fail-closed via
+		// AbsenceTypeCatalog::isCreatable for codes that never materialize.
+		foreach ($input as $code => $row) {
+			if (!is_string($code) || !AbsenceTypeCatalog::isCustom($code)
+				|| array_key_exists($code, $matrix) || !is_array($row)) {
+				continue;
+			}
+			$matrix[$code] = [];
+			foreach (Constants::HR_NOTIFICATION_EVENTS as $eventKey) {
+				$v = $row[$eventKey] ?? false;
+				$matrix[$code][$eventKey] = $v === true || $v === 1 || $v === '1' || $v === 'true';
+			}
+		}
 		return json_encode($matrix, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
 	}
 

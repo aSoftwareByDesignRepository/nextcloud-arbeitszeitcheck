@@ -13,6 +13,7 @@ import AxeBuilder from '@axe-core/playwright'
 import { login, credsFromEnv, skipIfMissingCreds } from './helpers/auth.js'
 import { api, apiAllowFailure } from './helpers/api.js'
 import { assertArbeitszeitcheckLoaded } from './helpers/app-config.js'
+import { ensureUserRuleCoverage } from './helpers/business-trip-rules.js'
 
 test.use({ trace: 'off' })
 
@@ -28,42 +29,53 @@ const PAGE = '/apps/arbeitszeitcheck/manager/business-trips'
  *  drafts count toward the overlap check. */
 async function submitTrip(page, purpose) {
 	const iso = (d) => d.toISOString().slice(0, 10)
-	for (let attempt = 0; attempt < 8; attempt++) {
-		const base = new Date('2028-03-01T00:00:00Z').getTime()
-			+ (Date.now() % 240) * 86400000
-			+ Math.floor(Math.random() * 60) * 86400000
-		const created = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/business-trips', {
-			data: {
-				startsAtUtc: `${iso(new Date(base))}T07:00:00Z`,
-				endsAtUtc: `${iso(new Date(base + 2 * 86400000))}T16:00:00Z`,
-				originTimezone: 'Europe/Berlin',
-				destinationTimezone: 'Europe/Berlin',
-				evaluationTimezone: 'Europe/Berlin',
-				purpose,
-				requestKey: `e2e-mbt-queue-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-			},
-		})
-		if (!created.ok) {
-			if (!/overlap/i.test(created.json?.error || '')) {
-				throw new Error(`trip create failed (${created.status}): ${created.json?.error || 'unknown'}`)
+	const adminPage = await page.context().browser().newPage()
+	try {
+		await login(adminPage, credsFromEnv('ADMIN'))
+		const employeeUid = credsFromEnv('EMPLOYEE').username
+		for (let attempt = 0; attempt < 8; attempt++) {
+			const base = new Date('2028-03-01T00:00:00Z').getTime()
+				+ (Date.now() % 240) * 86400000
+				+ Math.floor(Math.random() * 60) * 86400000
+			const coverage = await ensureUserRuleCoverage(adminPage, employeeUid, base - 86400000, base + 3 * 86400000, base + 2 * 86400000)
+			if (!coverage) {
+				continue
 			}
-			continue
+			const created = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/business-trips', {
+				data: {
+					startsAtUtc: `${iso(new Date(base))}T07:00:00Z`,
+					endsAtUtc: `${iso(new Date(base + 2 * 86400000))}T16:00:00Z`,
+					originTimezone: 'Europe/Berlin',
+					destinationTimezone: 'Europe/Berlin',
+					evaluationTimezone: 'Europe/Berlin',
+					purpose,
+					requestKey: `e2e-mbt-queue-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+				},
+			})
+			if (!created.ok) {
+				if (!/overlap/i.test(created.json?.error || '')) {
+					throw new Error(`trip create failed (${created.status}): ${created.json?.error || 'unknown'}`)
+				}
+				continue
+			}
+			const tripId = created.json.trip.id
+			const detail = await api(page, 'GET', `/apps/arbeitszeitcheck/api/business-trips/${tripId}`)
+			const submitted = await apiAllowFailure(page, 'POST', `/apps/arbeitszeitcheck/api/business-trips/${tripId}/submit`, {
+				data: { revision: detail.trip.revision },
+			})
+			if (submitted.ok) {
+				expect(submitted.json.trip.status).toBe('submitted')
+				return tripId
+			}
+			if (!/overlap/i.test(submitted.json?.error || '')) {
+				throw new Error(`trip submit failed (${submitted.status}): ${submitted.json?.error || 'unknown'}`)
+			}
+			await withdrawTrip(page, tripId)
 		}
-		const tripId = created.json.trip.id
-		const detail = await api(page, 'GET', `/apps/arbeitszeitcheck/api/business-trips/${tripId}`)
-		const submitted = await apiAllowFailure(page, 'POST', `/apps/arbeitszeitcheck/api/business-trips/${tripId}/submit`, {
-			data: { revision: detail.trip.revision },
-		})
-		if (submitted.ok) {
-			expect(submitted.json.trip.status).toBe('submitted')
-			return tripId
-		}
-		if (!/overlap/i.test(submitted.json?.error || '')) {
-			throw new Error(`trip submit failed (${submitted.status}): ${submitted.json?.error || 'unknown'}`)
-		}
-		await withdrawTrip(page, tripId)
+		throw new Error('could not place a non-overlapping trip after 8 attempts')
+	} finally {
+		await adminPage.close()
 	}
-	throw new Error('could not place a non-overlapping trip after 8 attempts')
 }
 
 /** Nextcloud's first-run wizard animates in a few seconds after first

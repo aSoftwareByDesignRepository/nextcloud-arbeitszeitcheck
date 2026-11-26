@@ -16,80 +16,17 @@ import { test, expect } from '@playwright/test'
 import { login, credsFromEnv, skipIfMissingCreds } from './helpers/auth.js'
 import { api, apiAllowFailure } from './helpers/api.js'
 import { assertArbeitszeitcheckLoaded } from './helpers/app-config.js'
+import { ensureUserRuleCoverage } from './helpers/business-trip-rules.js'
 
 test.use({ trace: 'off' })
 
 const MGR_API = '/apps/arbeitszeitcheck/api/manager/business-trips'
 const PAGE = '/apps/arbeitszeitcheck/manager/business-trips'
-const ADMIN_BT = '/apps/arbeitszeitcheck/api/admin'
 
 /** Unique far-future window per attempt — trips persist in the dev DB, so
  * fixed dates collide with prior runs (overlap validator). */
 function tripWindowBaseMs(attempt) {
 	return new Date('2028-01-05T00:00:00Z').getTime() + (Date.now() % 280) * 86400000 + Math.floor(Math.random() * 30) * 86400000 + attempt * 86400000 * 45
-}
-
-/** Rule-set coverage for the chosen date. Ambient org assignments cannot
- * be trusted: each one pins a specific rule-set VERSION, and every
- * lifecycle spec activation retires the previous version — the rows stay
- * effective but resolve to dead sets. Provision a bounded USER-scope
- * assignment (highest scope precedence) on the set that is active right
- * now. The overlap guard only checks same-user rows: stale ones starting
- * before the window get truncated at its edge; ones starting inside the
- * window make the attempt fail so the retry shifts the date +45d (always
- * past a ≤4d stub). Returns false when coverage cannot be placed. */
-async function ensureUserRuleCoverage(adminPage, employeeUid, baseMs) {
-	const iso = (ms) => new Date(ms).toISOString().slice(0, 10)
-	const sets = (await api(adminPage, 'GET', `${ADMIN_BT}/business-trip-rule-sets`)).items ?? []
-	let active = sets.find((s) => s.status === 'active')
-	if (!active) {
-		const draft = await api(adminPage, 'POST', `${ADMIN_BT}/business-trip-rule-presets/DE`)
-		await api(adminPage, 'POST', `${ADMIN_BT}/business-trip-rule-sets/${draft.item.id}/mark-reviewed`, {
-			data: { configHash: draft.item.configHash },
-		})
-		active = (await api(adminPage, 'POST', `${ADMIN_BT}/business-trip-rule-sets/${draft.item.id}/activate`)).item
-	}
-	const rows = (await api(adminPage, 'GET', `${ADMIN_BT}/business-trip-rule-assignments`)).items ?? []
-	let from = baseMs - 86400000
-	let to = baseMs + 2 * 86400000
-	for (let guard = 0; guard < 10; guard++) {
-		const hit = rows.find((a) => a.scopeType === 'user' && a.scopeId === employeeUid
-			&& a.effectiveFrom <= iso(to) && (!a.effectiveTo || a.effectiveTo >= iso(from)))
-		if (!hit) {
-			break
-		}
-		if (hit.effectiveFrom < iso(from)) {
-			// Row starts before the window — truncate it at the window edge.
-			const ended = await apiAllowFailure(adminPage, 'POST', `${ADMIN_BT}/business-trip-rule-assignments/${hit.id}/end`, {
-				data: { revision: hit.revision, effectiveTo: iso(from - 86400000) },
-			})
-			if (!ended.ok) {
-				return false
-			}
-			hit.effectiveTo = iso(from - 86400000)
-			hit.revision += 1
-			continue
-		}
-		// Row starts inside the window. If it only clips the tail, shrink the
-		// window ahead of it while it still covers both trip days; otherwise
-		// bail — the retry window shifts +45d, past any ≤4d stub.
-		if (hit.effectiveFrom > iso(baseMs + 86400000)) {
-			to = new Date(`${hit.effectiveFrom}T00:00:00Z`).getTime() - 86400000
-			continue
-		}
-		return false
-	}
-	const res = await apiAllowFailure(adminPage, 'POST', `${ADMIN_BT}/business-trip-rule-assignments`, {
-		data: {
-			ruleSetId: active.id,
-			scopeType: 'user',
-			scopeId: employeeUid,
-			priority: 0,
-			effectiveFrom: iso(from),
-			effectiveTo: iso(to),
-		},
-	})
-	return res.ok
 }
 
 /** One attempt; returns the trip id, or null when the window is already
@@ -144,7 +81,7 @@ async function createAndSubmitTrip(page, adminPage, purpose) {
 	const employeeUid = credsFromEnv('EMPLOYEE').username
 	for (let attempt = 0; attempt < 8; attempt++) {
 		const base = tripWindowBaseMs(attempt)
-		if (!(await ensureUserRuleCoverage(adminPage, employeeUid, base))) {
+		if (!(await ensureUserRuleCoverage(adminPage, employeeUid, base - 86400000, base + 2 * 86400000, base + 86400000))) {
 			continue
 		}
 		const tripId = await createTripOnce(page, purpose, attempt, base)

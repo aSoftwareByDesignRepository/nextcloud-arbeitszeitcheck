@@ -33,7 +33,9 @@ function sql(query) {
 function seedDay(uid, stamp) {
 	for (let i = 0; i < 30; i++) {
 		const d = new Date('2026-11-02T00:00:00Z') // Mon, before DST edge cases
-		d.setUTCDate(d.getUTCDate() + ((stamp + i) % 22))
+		// 90-day space (Nov 2 → Jan 30, all CET): the 22-day window filled up
+		// with leaked entries from earlier runs and exhausted the probe.
+		d.setUTCDate(d.getUTCDate() + ((stamp + i) % 90))
 		const day = d.toISOString().slice(0, 10)
 		// Overlap probe, not start-of-day probe: an overnight entry ending on
 		// `day` (leaked overnight-daily-maximum rows do exactly this) collides

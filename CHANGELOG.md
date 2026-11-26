@@ -19,9 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - companion: hour request form, owner correction card, manager decide/direct surface,
   workforce policy capabilities parsing, 15 locales
 - admin workforce policy section + year-end admin page
+- report team scopes walk the team hierarchy: the report team selector lists managed
+  sub-teams (indented), a parent team resolves members recursively with cycle guard +
+  depth cap, and foreign/nonexistent teams collapse into a uniform 404 (issue #51)
+- custom absence types normalized into the HR notification matrix (fail-closed send)
+- earliest_counted_start clamp resolved through the entity counted API; web + mobile
+  show "Counted from" when the clamp moved the counted start (accounting-only)
 
 ### Fixed
 
+- localized type/status/location labels in reports + exports (issue #52): absence
+  rows carry type_label/status_label, work-location categories carry category_label,
+  and summary maps ship absence_type_labels/absence_status_labels — German managers
+  no longer see English codes
 - overtime adjustment insert + audit now atomic (C-01, savepoint-safe under caller tx)
 - manager pending queue splits completed-absence requests into absence_correction_request
   so decide calls reach the working endpoint (was a permanently stuck queue item)

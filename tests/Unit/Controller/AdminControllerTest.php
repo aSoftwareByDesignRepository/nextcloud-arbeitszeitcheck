@@ -589,7 +589,6 @@ class AdminControllerTest extends TestCase
 	private function currentAdminSettingsRevision(): string
 	{
 		$m = new \ReflectionMethod(AdminController::class, 'adminSettingsRevision');
-		$m->setAccessible(true);
 		return $m->invoke($this->controller);
 	}
 
@@ -5893,7 +5892,6 @@ class AdminControllerTest extends TestCase
 	public function testHrEventTypesMatchDeclaredNotificationEvents(): void
 	{
 		$m = new \ReflectionMethod(AdminController::class, 'getNotificationEventTypes');
-		$m->setAccessible(true);
 		$types = $m->invoke($this->controller);
 		$keys = array_column($types, 'key');
 		sort($keys);

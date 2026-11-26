@@ -3981,7 +3981,7 @@
         "Period and duration": "Period och varaktighet",
         "Period reset (plus → 0)": "Periodåterställning (plus → 0)",
         "Period: %1$s to %2$s": "Period: %1$s till %2$s",
-        "Period: %s": "Period: %s",
+        "Period: %s": "Period: %1$s",
         "Person": "Person",
         "Person (user id)": "Person (användar-id)",
         "Personal Information": "Personlig information",

@@ -1084,19 +1084,44 @@ final class BreakPolicyResolver
 			$nonWork[] = [$piece['start'], $piece['end']];
 		}
 		$excluded = $this->splitResultEpochPairs($entry, 'excluded');
+		$result = $entry->getAccountingResult();
+		$terminalState = is_array($result)
+			&& in_array($result['state'] ?? null, ['applied', 'review'], true);
+		if ($excluded === null && $terminalState) {
+			// Terminal result whose `excluded` list alone is unreadable:
+			// X = R \ segments (spec §9.6 step 7) — rebuild the intervals so
+			// pre-threshold exclusion clips to the window instead of
+			// shrinking it by the full scalar.
+			$segments = $this->splitResultEpochPairs($entry, 'segments');
+			$startTs = $entry->getStartTime()?->getTimestamp();
+			if (is_array($segments) && $startTs !== null) {
+				$excluded = SplitServiceAccounting::subtract([[$startTs, $endTs]], $segments);
+			}
+		}
 		if ($excluded !== null) {
+			// Raw pairs — intersect bounds to the counted window; pre-clipping
+			// here could emit [end<start] for a fully pre-threshold interval
+			// and union() fails closed on it.
 			foreach ($excluded as [$s, $e]) {
-				$nonWork[] = [max($s, $threshold), min($e, $endTs)];
+				$nonWork[] = [$s, $e];
 			}
 			$sum = SplitServiceAccounting::totalSeconds(
 				SplitServiceAccounting::intersect($nonWork, [[$threshold, $endTs]])
 			);
 		} else {
-			// No frozen split result: mirror getDurationHours — full breaks
-			// inside the window plus the stored excluded seconds.
 			$sum = SplitServiceAccounting::totalSeconds(
 				SplitServiceAccounting::intersect($nonWork, [[$threshold, $endTs]])
-			) + $entry->getExcludedWorkSeconds();
+			);
+			// Scalar-only remainder (corrupt result, legacy scalar rows):
+			// subtract exactly when the raw path would — an effective or
+			// undecodable context (FM-11). A decodable context without a
+			// terminal result leaves the scalar untouched on raw reads, so
+			// it must not shrink the counted window either. The scalar
+			// carries no intervals: pre-threshold exclusion still subtracts
+			// fully — the conservative floor, never an over-credit.
+			if ($entry->hasInvalidWorkContext() || $terminalState) {
+				$sum += $entry->getExcludedWorkSeconds();
+			}
 		}
 		return max(0, ($endTs - $threshold) - $sum);
 	}

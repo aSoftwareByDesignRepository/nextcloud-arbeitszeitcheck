@@ -1539,6 +1539,63 @@ class BreakPolicyResolverTest extends TestCase
 		$this->assertSame(0, $this->resolver->countedNetSeconds($entry));
 	}
 
+	public function testCountedNetSecondsReconstructsExcludedFromSegments(): void
+	{
+		$this->assignModel(['earliest_counted_start' => '08:00']);
+		$entry = $this->countedEntry('2026-06-15 06:00', '2026-06-15 18:00');
+		// Terminal split result: the real exclusion is 06:00–07:00 — the
+		// complement of segments 07:00–18:00 (X = R \ segments, §9.6 step 7).
+		// `excluded` is unreadable on purpose: the resolver must rebuild the
+		// intervals and clip them instead of subtracting the whole scalar.
+		$entry->setWorkContextJson(json_encode([
+			'result' => [
+				'state' => 'applied',
+				'split' => true,
+				'excluded' => [['not-a-date']],
+				'segments' => [[
+					'2026-06-15T07:00:00+02:00',
+					'2026-06-15T18:00:00+02:00',
+				]],
+			],
+		]));
+		$entry->setExcludedWorkSeconds(3600);
+		// counted window 08:00–18:00 = 36000 s — the excluded hour sits
+		// fully before the threshold and must not shrink the window.
+		$this->assertSame(36000, $this->resolver->countedNetSeconds($entry));
+	}
+
+	public function testCountedNetSecondsScalarFallbackWhenIntervalsUnrecoverable(): void
+	{
+		$this->assignModel(['earliest_counted_start' => '08:00']);
+		$entry = $this->countedEntry('2026-06-15 06:00', '2026-06-15 18:00');
+		$entry->setWorkContextJson(json_encode([
+			'result' => [
+				'state' => 'applied',
+				'split' => true,
+				'excluded' => [['not-a-date']],
+				'segments' => [['not-a-date']],
+			],
+		]));
+		$entry->setExcludedWorkSeconds(3600);
+		// No interval data at all → the scalar mirrors getDurationHours'
+		// conservative subtraction (never silently re-credit, FM-11).
+		$this->assertSame(32400, $this->resolver->countedNetSeconds($entry));
+	}
+
+	public function testCountedNetSecondsIgnoresScalarWithoutTerminalResult(): void
+	{
+		$this->assignModel(['earliest_counted_start' => '08:00']);
+		$entry = $this->countedEntry('2026-06-15 06:00', '2026-06-15 18:00');
+		// Decodable context, provisional (non-terminal) result: the raw
+		// duration path ignores the stored scalar — the counted path must
+		// mirror it instead of over-deducting.
+		$entry->setWorkContextJson(json_encode([
+			'result' => ['state' => 'active', 'split' => false, 'excluded' => [], 'segments' => []],
+		]));
+		$entry->setExcludedWorkSeconds(3600);
+		$this->assertSame(36000, $this->resolver->countedNetSeconds($entry));
+	}
+
 	public function testCountedPaidBreakSecondsClipsPreThresholdPaidBreak(): void
 	{
 		$this->assignModel([

@@ -16,6 +16,8 @@ declare(strict_types=1);
                         </div>
                     </header>
                     <div class="azc-card__body">
+					<input type="hidden" id="overtimeNotificationRevision" name="overtimeNotificationRevision"
+						value="<?php p((string)($settings['overtimeNotificationRevision'] ?? '')); ?>">
 					<h3 id="block-trafficlight-recipients-heading" class="admin-settings-subsection__title"><?php p($l->t('Activation and recipients')); ?></h3>
 					<div class="form-group">
 						<div class="form-checkbox">

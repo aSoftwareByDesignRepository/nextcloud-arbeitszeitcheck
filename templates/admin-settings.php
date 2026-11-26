@@ -131,6 +131,8 @@ $showSettingsSaveFooter = !$isTransferSection && ($renderAll || !in_array($setti
                   data-initial-country="<?php p($settings['country'] ?? \OCA\ArbeitszeitCheck\Support\RegionRegistry::COUNTRY_DE); ?>">
                 <input type="hidden" name="requesttoken" value="<?php p($_['requesttoken'] ?? ''); ?>">
                 <input type="hidden" name="settings_section" value="<?php p($formScope); ?>">
+				<input type="hidden" id="adminSettingsRevision" name="adminSettingsRevision"
+					value="<?php p((string)($settings['adminSettingsRevision'] ?? '')); ?>">
 
 				<?php
 				$includeSection = static function (string $slug) use (

@@ -2003,6 +2003,7 @@ class AdminController extends Controller
 		$settings = $this->halfDaySettingsPayload() + [
 			'assignmentsGapPolicy' => $this->assignmentsGapPolicy(),
 			'workforcePolicy' => $this->workforcePolicyPayload(),
+			'adminSettingsRevision' => $this->adminSettingsRevision(),
 			'autoComplianceCheck' => $this->appConfig->getAppValueString('auto_compliance_check', '1') === '1',
 			'realtimeComplianceCheck' => $this->appConfig->getAppValueString('realtime_compliance_check', '1') === '1',
 			'complianceStrictMode' => $this->appConfig->getAppValueString('compliance_strict_mode', '0') === '1',
@@ -3626,6 +3627,9 @@ class AdminController extends Controller
 				// Optional-workforce policy + revision (CAS token for saves)
 				// — §9.1 GET parity for web and companion clients.
 				'workforcePolicy' => $this->workforcePolicyPayload(),
+				// Same parity for the flat-settings CAS token echoed back
+				// as `adminSettingsRevision` on writes.
+				'adminSettingsRevision' => $this->adminSettingsRevision(),
 			];
 
 			return new JSONResponse([
@@ -3732,56 +3736,56 @@ class AdminController extends Controller
 				}
 			}
 
-			// List of allowed admin settings keys
-			$allowedKeys = [
-				'autoComplianceCheck' => 'auto_compliance_check',
-				'realtimeComplianceCheck' => 'realtime_compliance_check',
-				'complianceStrictMode' => 'compliance_strict_mode',
-				'enableViolationNotifications' => 'enable_violation_notifications',
-				'breakAutoFallbackEnabled' => 'break_auto_fallback_enabled',
-				'breakAutoFallbackMinutes' => 'break_auto_fallback_minutes',
-				'breakAutoFallbackFlexWindowStart' => 'break_auto_fallback_flex_window_start',
-				'breakAutoFallbackFlexWindowEnd' => 'break_auto_fallback_flex_window_end',
-				'missingClockInRemindersEnabled' => 'missing_clock_in_reminders_enabled',
-				'exportMidnightSplitEnabled' => 'export_midnight_split_enabled',
-				'monthClosureEnabled' => Constants::CONFIG_MONTH_CLOSURE_ENABLED,
-				'monthClosureGraceDaysAfterEom' => Constants::CONFIG_MONTH_CLOSURE_GRACE_DAYS_AFTER_EOM,
-				'requireSubstituteTypes' => 'require_substitute_types',
-				'halfDayEnabledTypes' => Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
-				'sendIcalApprovedAbsences' => 'send_ical_approved_absences',
-				'sendIcalToSubstitute' => 'send_ical_to_substitute',
-				'sendIcalToManagers' => 'send_ical_to_managers',
-				'sendEmailSubstitutionRequest' => 'send_email_substitution_request',
-				'sendEmailSubstituteApprovedToEmployee' => 'send_email_substitute_approved_to_employee',
-				'sendEmailSubstituteApprovedToManager' => 'send_email_substitute_approved_to_manager',
-				'managerPendingEmailAbsences' => Constants::CONFIG_MANAGER_PENDING_EMAIL_ABSENCES,
-				'managerPendingEmailManualEntries' => Constants::CONFIG_MANAGER_PENDING_EMAIL_MANUAL_ENTRIES,
-				'managerPendingEmailCorrections' => Constants::CONFIG_MANAGER_PENDING_EMAIL_CORRECTIONS,
-				'managerPendingEmailMode' => Constants::CONFIG_MANAGER_PENDING_EMAIL_MODE,
-				'maxDailyHours' => 'max_daily_hours',
-				'minRestPeriod' => 'min_rest_period',
-				'timePickerMinuteStep' => Constants::CONFIG_TIME_PICKER_MINUTE_STEP,
-				// 'country' must precede 'germanState' so a combined save
-				// validates the region against the country from this request.
-				'country' => 'country',
-				'germanState' => 'german_state',
-				'weeklyAbsoluteMaxHours' => 'weekly_absolute_max_hours',
-				'statutoryAutoReseed' => 'statutory_auto_reseed',
-				'retentionPeriod' => 'retention_period',
-				'defaultWorkingHours' => 'default_working_hours',
-				'vacationCarryoverExpiryMonth' => Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH,
-				'vacationCarryoverExpiryDay' => Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY,
-				'vacationCarryoverMaxDays' => Constants::CONFIG_VACATION_CARRYOVER_MAX_DAYS,
-				'vacationRolloverEnabled' => Constants::CONFIG_VACATION_ROLLOVER_ENABLED,
-				'vacationRolloverIncludeUnusedAnnual' => Constants::CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL,
-				'timeEntryChangesRequireApproval' => Constants::CONFIG_TIME_ENTRY_CHANGES_REQUIRE_APPROVAL,
-				'manualTimeEntriesRequireApproval' => Constants::CONFIG_MANUAL_TIME_ENTRIES_REQUIRE_APPROVAL,
-				'projectCheckIntegrationEnabled' => Constants::CONFIG_PROJECTCHECK_INTEGRATION_ENABLED,
-				'offlineStampMaxPastHours' => Constants::CONFIG_OFFLINE_STAMP_MAX_PAST_HOURS,
-				'autoClockOutEnabled' => Constants::CONFIG_AUTO_CLOCK_OUT_ENABLED,
-				'autoClockOutHour' => Constants::CONFIG_AUTO_CLOCK_OUT_HOUR,
-				'autoClockOutScope' => Constants::CONFIG_AUTO_CLOCK_OUT_SCOPE,
-			];
+			// The flat settings form posts a full snapshot of every scalar key
+			// below, so a stale tab would silently revert all of them — same
+			// defect class the notification CAS covers. One shared
+			// `adminSettingsRevision` guards the whole writable family
+			// (DATEV credentials included). Absent token = legacy client.
+			$allowedKeys = $this->adminSettingsWritableKeyMap();
+			$hasScopedWrite = false;
+			foreach (array_keys($allowedKeys) as $pk) {
+				if ($paramAllowed($pk) && array_key_exists($pk, $params)) {
+					$hasScopedWrite = true;
+					break;
+				}
+			}
+			if (!$hasScopedWrite && $paramAllowed('datevBeraternummer')) {
+				foreach (['datevBeraternummer', 'datevMandantennummer',
+					'datevLohnartNormal', 'datevLohnartUeberstunden'] as $pk) {
+					if (array_key_exists($pk, $params)) {
+						$hasScopedWrite = true;
+						break;
+					}
+				}
+			}
+			if (!$hasScopedWrite && $accessScopeOk) {
+				foreach (['accessRestrictionEnabled', 'accessAllowedGroups',
+					'accessAllowedUserIds', 'appAdminUserIds'] as $pk) {
+					if (array_key_exists($pk, $params)) {
+						$hasScopedWrite = true;
+						break;
+					}
+				}
+			}
+			if (!$hasScopedWrite && $timeCaptureScopeOk) {
+				foreach (['clockStampingEnabled', 'manualTimeEntryEnabled'] as $pk) {
+					if (array_key_exists($pk, $params)) {
+						$hasScopedWrite = true;
+						break;
+					}
+				}
+			}
+			if ($hasScopedWrite) {
+				$baseRevision = $params['adminSettingsRevision'] ?? null;
+				if ($baseRevision !== null && $baseRevision !== ''
+					&& (string)$baseRevision !== $this->adminSettingsRevision()) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('The settings were changed in the meantime. Reload the page and save again.'),
+						'code' => 'ADMIN_SETTINGS_CONFLICT',
+					], Http::STATUS_CONFLICT);
+				}
+			}
 
 			// Fail-fast validation for the auto clock-out settings: reject the
 			// whole request before any key is written, so a bad hour or scope
@@ -4163,6 +4167,11 @@ class AdminController extends Controller
 				], Http::STATUS_BAD_REQUEST);
 			}
 
+			// Fresh CAS tokens so a second save from the same page does not
+			// self-conflict on the revision it just advanced.
+			$updatedSettings['adminSettingsRevision'] = $this->adminSettingsRevision();
+			$updatedSettings['workforcePolicy'] = $this->workforcePolicyPayload();
+
 			return new JSONResponse([
 				'success' => true,
 				'message' => $this->l10n->t('Settings updated successfully'),
@@ -4175,6 +4184,108 @@ class AdminController extends Controller
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.')
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
+	}
+
+	/**
+	 * param-key => appConfig-key map for every scalar key
+	 * {@see updateAdminSettings()} may persist. Single source for the write
+	 * loop and the {@see adminSettingsRevision()} CAS hash so a newly added
+	 * key can never drift out of the guarded family.
+	 *
+	 * @return array<string,string>
+	 */
+	private function adminSettingsWritableKeyMap(): array
+	{
+		return [
+
+			'autoComplianceCheck' => 'auto_compliance_check',
+			'realtimeComplianceCheck' => 'realtime_compliance_check',
+			'complianceStrictMode' => 'compliance_strict_mode',
+			'enableViolationNotifications' => 'enable_violation_notifications',
+			'breakAutoFallbackEnabled' => 'break_auto_fallback_enabled',
+			'breakAutoFallbackMinutes' => 'break_auto_fallback_minutes',
+			'breakAutoFallbackFlexWindowStart' => 'break_auto_fallback_flex_window_start',
+			'breakAutoFallbackFlexWindowEnd' => 'break_auto_fallback_flex_window_end',
+			'missingClockInRemindersEnabled' => 'missing_clock_in_reminders_enabled',
+			'exportMidnightSplitEnabled' => 'export_midnight_split_enabled',
+			'monthClosureEnabled' => Constants::CONFIG_MONTH_CLOSURE_ENABLED,
+			'monthClosureGraceDaysAfterEom' => Constants::CONFIG_MONTH_CLOSURE_GRACE_DAYS_AFTER_EOM,
+			'requireSubstituteTypes' => 'require_substitute_types',
+			'halfDayEnabledTypes' => Constants::CONFIG_HALF_DAY_ENABLED_TYPES,
+			'sendIcalApprovedAbsences' => 'send_ical_approved_absences',
+			'sendIcalToSubstitute' => 'send_ical_to_substitute',
+			'sendIcalToManagers' => 'send_ical_to_managers',
+			'sendEmailSubstitutionRequest' => 'send_email_substitution_request',
+			'sendEmailSubstituteApprovedToEmployee' => 'send_email_substitute_approved_to_employee',
+			'sendEmailSubstituteApprovedToManager' => 'send_email_substitute_approved_to_manager',
+			'managerPendingEmailAbsences' => Constants::CONFIG_MANAGER_PENDING_EMAIL_ABSENCES,
+			'managerPendingEmailManualEntries' => Constants::CONFIG_MANAGER_PENDING_EMAIL_MANUAL_ENTRIES,
+			'managerPendingEmailCorrections' => Constants::CONFIG_MANAGER_PENDING_EMAIL_CORRECTIONS,
+			'managerPendingEmailMode' => Constants::CONFIG_MANAGER_PENDING_EMAIL_MODE,
+			'maxDailyHours' => 'max_daily_hours',
+			'minRestPeriod' => 'min_rest_period',
+			'timePickerMinuteStep' => Constants::CONFIG_TIME_PICKER_MINUTE_STEP,
+			// 'country' must precede 'germanState' so a combined save
+			// validates the region against the country from this request.
+			'country' => 'country',
+			'germanState' => 'german_state',
+			'weeklyAbsoluteMaxHours' => 'weekly_absolute_max_hours',
+			'statutoryAutoReseed' => 'statutory_auto_reseed',
+			'retentionPeriod' => 'retention_period',
+			'defaultWorkingHours' => 'default_working_hours',
+			'vacationCarryoverExpiryMonth' => Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH,
+			'vacationCarryoverExpiryDay' => Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY,
+			'vacationCarryoverMaxDays' => Constants::CONFIG_VACATION_CARRYOVER_MAX_DAYS,
+			'vacationRolloverEnabled' => Constants::CONFIG_VACATION_ROLLOVER_ENABLED,
+			'vacationRolloverIncludeUnusedAnnual' => Constants::CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL,
+			'timeEntryChangesRequireApproval' => Constants::CONFIG_TIME_ENTRY_CHANGES_REQUIRE_APPROVAL,
+			'manualTimeEntriesRequireApproval' => Constants::CONFIG_MANUAL_TIME_ENTRIES_REQUIRE_APPROVAL,
+			'projectCheckIntegrationEnabled' => Constants::CONFIG_PROJECTCHECK_INTEGRATION_ENABLED,
+			'offlineStampMaxPastHours' => Constants::CONFIG_OFFLINE_STAMP_MAX_PAST_HOURS,
+			'autoClockOutEnabled' => Constants::CONFIG_AUTO_CLOCK_OUT_ENABLED,
+			'autoClockOutHour' => Constants::CONFIG_AUTO_CLOCK_OUT_HOUR,
+			'autoClockOutScope' => Constants::CONFIG_AUTO_CLOCK_OUT_SCOPE,
+		];
+	}
+
+	/**
+	 * Optimistic-lock revision over every appConfig key
+	 * {@see updateAdminSettings()} can persist (the writable-key map plus
+	 * the four DATEV credential keys), hashed over the RAW stored
+	 * `key=value` pairs — plus the access-door snapshot, folded in via the
+	 * same render-side accessors the page displays (written back through
+	 * PermissionService::saveAccessDoorPolicy, so hashing raw config keys
+	 * there would hit a different storage path). Excluded on purpose:
+	 * workforce policy (service revision CAS) and the org break policy
+	 * (breakPolicyRevision CAS).
+	 */
+	private function adminSettingsRevision(): string
+	{
+		$keys = array_values($this->adminSettingsWritableKeyMap());
+		$keys[] = Constants::CONFIG_DATEV_BERATERNUMMER;
+		$keys[] = Constants::CONFIG_DATEV_MANDANTENNUMMER;
+		$keys[] = Constants::CONFIG_DATEV_LOHNART_NORMAL;
+		$keys[] = Constants::CONFIG_DATEV_LOHNART_UEBERSTUNDEN;
+		$keys = array_values(array_unique($keys));
+		sort($keys);
+		$doc = '';
+		foreach ($keys as $k) {
+			$doc .= $k . '=' . $this->appConfig->getAppValueString($k, '') . "\x00";
+		}
+		$doc .= 'access=' . json_encode([
+			$this->isAccessRestrictionEnabledFromConfig(),
+			$this->getAllowedAccessGroupsFromConfig(),
+			$this->getConfiguredAccessAllowedUserIds(),
+			$this->getConfiguredAppAdminUserIds(),
+		]);
+		// Org time-capture flags are persisted through the service's own
+		// IConfig write (persistOrganizationBoolean), not the writable map —
+		// hashed via the same render-side accessors the page displays.
+		$doc .= 'capture=' . json_encode([
+			$this->timeCaptureMethodService->isOrganizationClockStampingEnabled(),
+			$this->timeCaptureMethodService->isOrganizationManualTimeEntryEnabled(),
+		]);
+		return substr(hash('sha256', $doc), 0, 16);
 	}
 
 	#[NoAdminRequired]
@@ -4562,6 +4673,80 @@ class AdminController extends Controller
 						$performedBy
 					);
 				}
+
+			// Optimistic-lock CAS: each notification section echoes the
+			// revision its form rendered (`hrNotificationRevision` /
+			// `overtimeNotificationRevision`). A stale tab/parallel admin
+			// holding an older revision must never silently overwrite the
+			// newer document — same guard breakPolicyRevision applies to
+			// break rules. Checked before ANY sibling write so a conflict
+			// leaves nothing half-committed. Absent token = legacy client
+			// → allowed (backward compatible).
+			if ($hrWrite !== null) {
+				$baseRevision = $params['hrNotificationRevision'] ?? null;
+				if ($baseRevision !== null && $baseRevision !== ''
+					&& (string)$baseRevision !== $this->hrNotificationSettingsRevision()) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('The notification settings were changed in the meantime. Reload the page and save again.'),
+						'code' => 'NOTIFICATION_SETTINGS_CONFLICT',
+					], Http::STATUS_CONFLICT);
+				}
+			}
+			if ($trafficWrite !== null) {
+				$baseRevision = $params['overtimeNotificationRevision'] ?? null;
+				if ($baseRevision !== null && $baseRevision !== ''
+					&& (string)$baseRevision !== $this->overtimeNotificationSettingsRevision()) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('The notification settings were changed in the meantime. Reload the page and save again.'),
+						'code' => 'NOTIFICATION_SETTINGS_CONFLICT',
+					], Http::STATUS_CONFLICT);
+				}
+			}
+			// Same CAS for the rest of the monolithic form: the page always
+			// posts a full snapshot of every remaining settings key (bank,
+			// payout flags, paid-absence/leave-soll, gap policy, DATEV map,
+			// e-mail/iCal toggles, vacation carryover/rollover/proration…).
+			// A stale tab would therefore revert ALL of them, so one shared
+			// `generalNotificationRevision` covers the whole family. The
+			// premium policy JSON + workforce policy + vacation year-mode
+			// flip carry their own locks/CAS and stay excluded.
+			$hasGeneralWrite = $bankWrite !== null || $datevMapWrite !== null;
+			if (!$hasGeneralWrite) {
+				foreach ([
+					'overtimePayoutNotifyInApp', 'overtimePayoutNotifyEmail',
+					'overtimeBlockMonthClosurePendingPayout',
+					'paidAbsencePlannedHoursCreditEnabled', 'leaveSollEffectsEnabled',
+					'assignmentsGapPolicy',
+					'missingClockInRemindersEnabled', 'sendIcalApprovedAbsences',
+					'sendIcalToSubstitute', 'sendIcalToManagers',
+					'sendEmailSubstitutionRequest', 'sendEmailSubstituteApprovedToEmployee',
+					'sendEmailSubstituteApprovedToManager',
+					'managerPendingEmailAbsences', 'managerPendingEmailManualEntries',
+					'managerPendingEmailCorrections', 'managerPendingEmailMode',
+					'vacationCarryoverExpiryMonth', 'vacationCarryoverExpiryDay',
+					'vacationCarryoverMaxDays', 'vacationRolloverEnabled',
+					'vacationRolloverIncludeUnusedAnnual', 'vacationProrationMethod',
+					'vacationYearMode', 'premiumSurchargesEnabled',
+				] as $generalKey) {
+					if (array_key_exists($generalKey, $params)) {
+						$hasGeneralWrite = true;
+						break;
+					}
+				}
+			}
+			if ($hasGeneralWrite) {
+				$baseRevision = $params['generalNotificationRevision'] ?? null;
+				if ($baseRevision !== null && $baseRevision !== ''
+					&& (string)$baseRevision !== $this->generalNotificationSettingsRevision()) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('The notification settings were changed in the meantime. Reload the page and save again.'),
+						'code' => 'NOTIFICATION_SETTINGS_CONFLICT',
+					], Http::STATUS_CONFLICT);
+				}
+			}
 
 			// ── Commit phase (sibling settings) ──
 			if ($hrWrite !== null) {
@@ -5473,6 +5658,9 @@ class AdminController extends Controller
 
 		return $this->halfDaySettingsPayload() + [
 			'enabled' => $enabled,
+			'hrNotificationRevision' => $this->hrNotificationSettingsRevision(),
+			'overtimeNotificationRevision' => $this->overtimeNotificationSettingsRevision(),
+			'generalNotificationRevision' => $this->generalNotificationSettingsRevision(),
 			'recipients' => implode(', ', $recipients),
 			'matrix' => $this->normalizeNotificationMatrix($decoded),
 			'missingClockInRemindersEnabled' => $this->appConfig->getAppValueString('missing_clock_in_reminders_enabled', '1') === '1',
@@ -5541,6 +5729,92 @@ class AdminController extends Controller
 				$this->appConfig->getAppValueString(Constants::CONFIG_DATEV_LOHNART_PREMIUM_MAP, '')
 			),
 		];
+	}
+
+	/**
+	 * Optimistic-lock revision of the stored HR notification document
+	 * (enabled + recipients + matrix), hashed over the RAW stored strings
+	 * so page render and write boundary see byte-identical input. The form
+	 * echoes it back as `hrNotificationRevision`; a stale echo → 409.
+	 */
+	private function hrNotificationSettingsRevision(): string
+	{
+		return substr(hash('sha256',
+			$this->appConfig->getAppValueString(Constants::CONFIG_HR_NOTIFICATIONS_ENABLED, '0')
+			. '|' . $this->appConfig->getAppValueString(Constants::CONFIG_HR_NOTIFICATION_RECIPIENTS, '')
+			. '|' . $this->appConfig->getAppValueString(Constants::CONFIG_HR_NOTIFICATION_MATRIX_V1, '[]')
+		), 0, 16);
+	}
+
+	/**
+	 * Optimistic-lock revision of the stored balance-traffic-light
+	 * document (enabled + recipients + matrix + four thresholds), hashed
+	 * over the RAW stored strings. Echoed back as
+	 * `overtimeNotificationRevision`; a stale echo → 409.
+	 */
+	private function overtimeNotificationSettingsRevision(): string
+	{
+		return substr(hash('sha256',
+			$this->appConfig->getAppValueString(Constants::CONFIG_OVERTIME_TRAFFIC_LIGHT_ENABLED, '0')
+			. '|' . $this->appConfig->getAppValueString(Constants::CONFIG_OVERTIME_NOTIFICATION_RECIPIENTS, '')
+			. '|' . $this->appConfig->getAppValueString(Constants::CONFIG_OVERTIME_NOTIFICATION_MATRIX_V1, '[]')
+			. '|' . $this->appConfig->getAppValueString(Constants::CONFIG_OVERTIME_THRESHOLD_YELLOW_OVER, '5')
+			. '|' . $this->appConfig->getAppValueString(Constants::CONFIG_OVERTIME_THRESHOLD_RED_OVER, '15')
+			. '|' . $this->appConfig->getAppValueString(Constants::CONFIG_OVERTIME_THRESHOLD_YELLOW_UNDER, '5')
+			. '|' . $this->appConfig->getAppValueString(Constants::CONFIG_OVERTIME_THRESHOLD_RED_UNDER, '15')
+		), 0, 16);
+	}
+
+	/**
+	 * Optimistic-lock revision covering every remaining appConfig key the
+	 * notification settings endpoint persists (bank, payout flags,
+	 * paid-absence/leave-soll, gap policy, DATEV premium map, e-mail/iCal
+	 * toggles, manager-pending, vacation carryover/rollover/proration,
+	 * year mode, premium-surcharge flag) — hashed over the RAW stored
+	 * `key=value` pairs so page render and write boundary see
+	 * byte-identical input. Excluded on purpose: premium policy JSON +
+	 * version (own lock + CAS), workforce policy (service CAS).
+	 */
+	private function generalNotificationSettingsRevision(): string
+	{
+		$keys = [
+			Constants::CONFIG_ASSIGNMENTS_GAP_POLICY,
+			Constants::CONFIG_DATEV_LOHNART_PREMIUM_MAP,
+			Constants::CONFIG_LEAVE_SOLL_EFFECTS,
+			Constants::CONFIG_MANAGER_PENDING_EMAIL_ABSENCES,
+			Constants::CONFIG_MANAGER_PENDING_EMAIL_CORRECTIONS,
+			Constants::CONFIG_MANAGER_PENDING_EMAIL_MANUAL_ENTRIES,
+			Constants::CONFIG_MANAGER_PENDING_EMAIL_MODE,
+			Constants::CONFIG_OVERTIME_BANK_ENABLED,
+			Constants::CONFIG_OVERTIME_BANK_MAX_HOURS,
+			Constants::CONFIG_OVERTIME_BANK_RED_PERCENT,
+			Constants::CONFIG_OVERTIME_BANK_YELLOW_PERCENT,
+			Constants::CONFIG_OVERTIME_BLOCK_MONTH_CLOSURE_PENDING_PAYOUT,
+			Constants::CONFIG_OVERTIME_PAYOUT_NOTIFY_EMAIL,
+			Constants::CONFIG_OVERTIME_PAYOUT_NOTIFY_IN_APP,
+			Constants::CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT,
+			Constants::CONFIG_PREMIUM_SURCHARGES_ENABLED,
+			Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY,
+			Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH,
+			Constants::CONFIG_VACATION_CARRYOVER_MAX_DAYS,
+			Constants::CONFIG_VACATION_PRORATION_METHOD,
+			Constants::CONFIG_VACATION_ROLLOVER_ENABLED,
+			Constants::CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL,
+			Constants::CONFIG_VACATION_YEAR_MODE,
+			'missing_clock_in_reminders_enabled',
+			'send_email_substitute_approved_to_employee',
+			'send_email_substitute_approved_to_manager',
+			'send_email_substitution_request',
+			'send_ical_approved_absences',
+			'send_ical_to_managers',
+			'send_ical_to_substitute',
+		];
+		sort($keys);
+		$doc = '';
+		foreach ($keys as $k) {
+			$doc .= $k . '=' . $this->appConfig->getAppValueString($k, '') . "\x00";
+		}
+		return substr(hash('sha256', $doc), 0, 16);
 	}
 
 	/**

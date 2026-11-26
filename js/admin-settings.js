@@ -1350,12 +1350,21 @@
                     const confirmInput = document.getElementById('breakPolicyConfirm');
                     if (confirmBox) { confirmBox.hidden = true; }
                     if (confirmInput) { confirmInput.checked = false; }
-                    // Advance the CAS token so the next save from this page
-                    // carries the fresh revision, not the rendered one.
+                    // Advance the CAS tokens so the next save from this page
+                    // carries the fresh revisions, not the rendered ones.
                     const revInput = document.getElementById('breakPolicyRevision');
                     if (revInput && data.settings && data.settings.breakPolicy
                         && data.settings.breakPolicy.revision !== undefined) {
                         revInput.value = String(data.settings.breakPolicy.revision);
+                    }
+                    const adminRevInput = document.getElementById('adminSettingsRevision');
+                    if (adminRevInput && data.settings && typeof data.settings.adminSettingsRevision === 'string') {
+                        adminRevInput.value = data.settings.adminSettingsRevision;
+                    }
+                    const wfRevInput = form.querySelector('[name="workforcePolicyRevision"]');
+                    if (wfRevInput && data.settings && data.settings.workforcePolicy
+                        && data.settings.workforcePolicy.revision !== undefined) {
+                        wfRevInput.value = String(data.settings.workforcePolicy.revision);
                     }
                 } else {
                     handleFailurePayload(data);

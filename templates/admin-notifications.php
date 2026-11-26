@@ -32,6 +32,8 @@ $policyPages = is_array($_['policyPages'] ?? null) ? $_['policyPages'] : [];
 				novalidate
 				data-policy-scope="notifications">
                 <input type="hidden" name="requesttoken" value="<?php p($_['requesttoken'] ?? ''); ?>">
+				<input type="hidden" id="generalNotificationRevision" name="generalNotificationRevision"
+					value="<?php p((string)($settings['generalNotificationRevision'] ?? '')); ?>">
 
                 <div class="azc-admin-policy-form__sections">
 					<?php include __DIR__ . '/partials/admin-policy-clock-reminders.php'; ?>

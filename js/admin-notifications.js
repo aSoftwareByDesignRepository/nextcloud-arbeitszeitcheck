@@ -529,6 +529,10 @@
 				payload.enabled = enabled;
 				payload.recipients = recipients;
 				payload.matrix = collectMatrix(form, matrixMeta);
+				// Optimistic lock: send the document revision this page rendered —
+				// the server rejects with NOTIFICATION_SETTINGS_CONFLICT when
+				// another save landed in between instead of silently reverting it.
+				payload.hrNotificationRevision = domValue('#hrNotificationRevision', '');
 			}
 
 			if (hasTraffic) {
@@ -575,6 +579,7 @@
 				payload.overtimeRedOver = overtimeRedOver;
 				payload.overtimeYellowUnder = overtimeYellowUnder;
 				payload.overtimeRedUnder = overtimeRedUnder;
+				payload.overtimeNotificationRevision = domValue('#overtimeNotificationRevision', '');
 			}
 
 			if (hasBank) {
@@ -674,6 +679,11 @@
 				payload.datevLohnartPremiumMap = collectDatevLohnartPremiumMap(form);
 			}
 
+			// Optimistic lock for the remaining settings family (bank, payout,
+			// e-mail/iCal, vacation carryover…): the server compares this
+			// against the stored document whenever any covered field is posted.
+			payload.generalNotificationRevision = domValue('#generalNotificationRevision', '');
+
 			saving = true;
 			if (saveButton) {
 				saveButton.disabled = true;
@@ -708,6 +718,22 @@
 					}
 					if (hasTraffic && overtimeRecipientsField && Array.isArray(payload.overtimeRecipients)) {
 						overtimeRecipientsField.value = payload.overtimeRecipients.join(', ');
+					}
+					// Advance the CAS tokens so the next save from this page
+					// carries the fresh revision, not the rendered one.
+					if (response.settings) {
+						const hrRev = document.getElementById('hrNotificationRevision');
+						if (hrRev && typeof response.settings.hrNotificationRevision === 'string') {
+							hrRev.value = response.settings.hrNotificationRevision;
+						}
+						const otRev = document.getElementById('overtimeNotificationRevision');
+						if (otRev && typeof response.settings.overtimeNotificationRevision === 'string') {
+							otRev.value = response.settings.overtimeNotificationRevision;
+						}
+						const gRev = document.getElementById('generalNotificationRevision');
+						if (gRev && typeof response.settings.generalNotificationRevision === 'string') {
+							gRev.value = response.settings.generalNotificationRevision;
+						}
 					}
 					setLiveMessage(liveRegion, msg, 'success');
 					return;

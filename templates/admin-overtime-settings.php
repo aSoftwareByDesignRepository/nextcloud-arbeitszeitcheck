@@ -30,6 +30,8 @@ $premiumNightPreset = $_['premiumNightPreset'] ?? 'at';
 				data-policy-scope="overtime"
 				data-premium-night-preset="<?php p($premiumNightPreset); ?>">
                 <input type="hidden" name="requesttoken" value="<?php p($_['requesttoken'] ?? ''); ?>">
+				<input type="hidden" id="generalNotificationRevision" name="generalNotificationRevision"
+					value="<?php p((string)($settings['generalNotificationRevision'] ?? '')); ?>">
 
                 <div class="azc-admin-policy-form__sections">
 					<?php include __DIR__ . '/partials/admin-policy-overtime-bank.php'; ?>

@@ -305,4 +305,188 @@ class AdminVacationYearAckBehaviorTest extends TestCase
 		$this->assertSame(Constants::VACATION_YEAR_MODE_ANNIVERSARY, $data['vacationYearModeFlip']['to'] ?? null);
 		$this->assertArrayHasKey('allocationsRefreshed', $data['vacationYearModeFlip']);
 	}
+
+	public function testStaleHrNotificationRevisionReturns409BeforeWrites(): void
+	{
+		$this->stubCalendarYearMode();
+		$this->request->method('getParams')->willReturn([
+			'enabled' => false,
+			'recipients' => ['hr@example.com'],
+			'matrix' => [],
+			'hrNotificationRevision' => 'stale-revision-token',
+		]);
+		// The CAS check sits before the commit phase — a stale tab must not
+		// reach a single write, so no audit row may be logged either.
+		$this->auditLogMapper->expects($this->never())->method('logAction');
+
+		$response = $this->controller->updateNotificationSettings();
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		$this->assertSame('NOTIFICATION_SETTINGS_CONFLICT', $data['code']);
+	}
+
+	public function testCurrentHrNotificationRevisionPasses(): void
+	{
+		$this->stubCalendarYearMode();
+		// HR keys unset → the revision hashes the stored defaults
+		// '0' | '' | '[]' exactly as buildNotificationSettingsPayload does.
+		$revision = substr(hash('sha256', '0' . '|' . '' . '|' . '[]'), 0, 16);
+		$this->request->method('getParams')->willReturn([
+			'enabled' => false,
+			'recipients' => ['hr@example.com'],
+			'matrix' => [],
+			'hrNotificationRevision' => $revision,
+		]);
+
+		$response = $this->controller->updateNotificationSettings();
+		$data = $response->getData();
+		$this->assertTrue($data['success'], 'Response: ' . json_encode($data));
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+	}
+
+	public function testStaleOvertimeNotificationRevisionReturns409(): void
+	{
+		$this->stubCalendarYearMode();
+		$this->request->method('getParams')->willReturn([
+			'overtimeTrafficLightEnabled' => '0',
+			'overtimeNotificationRevision' => 'stale-revision-token',
+		]);
+		$this->auditLogMapper->expects($this->never())->method('logAction');
+
+		$response = $this->controller->updateNotificationSettings();
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		$this->assertSame('NOTIFICATION_SETTINGS_CONFLICT', $data['code']);
+	}
+
+	public function testCurrentOvertimeNotificationRevisionPasses(): void
+	{
+		$this->stubCalendarYearMode();
+		$revision = substr(hash('sha256',
+			'0' . '|' . '' . '|' . '[]' . '|' . '5' . '|' . '15' . '|' . '5' . '|' . '15'
+		), 0, 16);
+		$this->request->method('getParams')->willReturn([
+			'overtimeTrafficLightEnabled' => '0',
+			'overtimeNotificationRevision' => $revision,
+		]);
+
+		$response = $this->controller->updateNotificationSettings();
+		$data = $response->getData();
+		$this->assertTrue($data['success'], 'Response: ' . json_encode($data));
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+	}
+
+	/**
+	 * Mirrors AdminController::generalNotificationSettingsRevision(): the
+	 * same 30 covered keys sorted, joined as "key=raw\0" pairs. The stub
+	 * store only sets vacation_year_mode='calendar'; every other covered
+	 * key falls back to the helper's '' default.
+	 */
+	private function expectedGeneralNotificationRevision(): string
+	{
+		$keys = [
+			Constants::CONFIG_ASSIGNMENTS_GAP_POLICY,
+			Constants::CONFIG_DATEV_LOHNART_PREMIUM_MAP,
+			Constants::CONFIG_LEAVE_SOLL_EFFECTS,
+			Constants::CONFIG_MANAGER_PENDING_EMAIL_ABSENCES,
+			Constants::CONFIG_MANAGER_PENDING_EMAIL_CORRECTIONS,
+			Constants::CONFIG_MANAGER_PENDING_EMAIL_MANUAL_ENTRIES,
+			Constants::CONFIG_MANAGER_PENDING_EMAIL_MODE,
+			Constants::CONFIG_OVERTIME_BANK_ENABLED,
+			Constants::CONFIG_OVERTIME_BANK_MAX_HOURS,
+			Constants::CONFIG_OVERTIME_BANK_RED_PERCENT,
+			Constants::CONFIG_OVERTIME_BANK_YELLOW_PERCENT,
+			Constants::CONFIG_OVERTIME_BLOCK_MONTH_CLOSURE_PENDING_PAYOUT,
+			Constants::CONFIG_OVERTIME_PAYOUT_NOTIFY_EMAIL,
+			Constants::CONFIG_OVERTIME_PAYOUT_NOTIFY_IN_APP,
+			Constants::CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT,
+			Constants::CONFIG_PREMIUM_SURCHARGES_ENABLED,
+			Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_DAY,
+			Constants::CONFIG_VACATION_CARRYOVER_EXPIRY_MONTH,
+			Constants::CONFIG_VACATION_CARRYOVER_MAX_DAYS,
+			Constants::CONFIG_VACATION_PRORATION_METHOD,
+			Constants::CONFIG_VACATION_ROLLOVER_ENABLED,
+			Constants::CONFIG_VACATION_ROLLOVER_INCLUDE_UNUSED_ANNUAL,
+			Constants::CONFIG_VACATION_YEAR_MODE,
+			'missing_clock_in_reminders_enabled',
+			'send_email_substitute_approved_to_employee',
+			'send_email_substitute_approved_to_manager',
+			'send_email_substitution_request',
+			'send_ical_approved_absences',
+			'send_ical_to_managers',
+			'send_ical_to_substitute',
+		];
+		sort($keys);
+		$doc = '';
+		foreach ($keys as $k) {
+			$v = $k === Constants::CONFIG_VACATION_YEAR_MODE
+				? Constants::VACATION_YEAR_MODE_CALENDAR
+				: '';
+			$doc .= $k . '=' . $v . "\x00";
+		}
+		return substr(hash('sha256', $doc), 0, 16);
+	}
+
+	public function testStaleGeneralNotificationRevisionReturns409BeforeWrites(): void
+	{
+		$this->stubCalendarYearMode();
+		$this->request->method('getParams')->willReturn([
+			'missingClockInRemindersEnabled' => '1',
+			'generalNotificationRevision' => 'stale-revision-token',
+		]);
+		$this->auditLogMapper->expects($this->never())->method('logAction');
+
+		$response = $this->controller->updateNotificationSettings();
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		$this->assertSame('NOTIFICATION_SETTINGS_CONFLICT', $data['code']);
+	}
+
+	public function testStaleGeneralNotificationRevisionBlocksBankWrite(): void
+	{
+		$this->stubCalendarYearMode();
+		$this->request->method('getParams')->willReturn([
+			'overtimeBankEnabled' => '1',
+			'overtimeBankMaxHours' => '80',
+			'generalNotificationRevision' => 'stale-revision-token',
+		]);
+		$this->auditLogMapper->expects($this->never())->method('logAction');
+
+		$response = $this->controller->updateNotificationSettings();
+		$this->assertSame(Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('NOTIFICATION_SETTINGS_CONFLICT', $response->getData()['code']);
+	}
+
+	public function testCurrentGeneralNotificationRevisionPasses(): void
+	{
+		$this->stubCalendarYearMode();
+		$this->request->method('getParams')->willReturn([
+			'missingClockInRemindersEnabled' => '1',
+			'sendIcalToManagers' => '1',
+			'generalNotificationRevision' => $this->expectedGeneralNotificationRevision(),
+		]);
+
+		$response = $this->controller->updateNotificationSettings();
+		$data = $response->getData();
+		$this->assertTrue($data['success'], 'Response: ' . json_encode($data));
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+	}
+
+	public function testGeneralWriteWithoutRevisionTokenStillAllowed(): void
+	{
+		$this->stubCalendarYearMode();
+		// Legacy clients that never rendered the token keep working —
+		// the CAS is advisory, same contract as breakPolicyRevision.
+		$this->request->method('getParams')->willReturn([
+			'missingClockInRemindersEnabled' => '0',
+		]);
+
+		$response = $this->controller->updateNotificationSettings();
+		$data = $response->getData();
+		$this->assertTrue($data['success'], 'Response: ' . json_encode($data));
+		$this->assertSame(Http::STATUS_OK, $response->getStatus());
+	}
 }

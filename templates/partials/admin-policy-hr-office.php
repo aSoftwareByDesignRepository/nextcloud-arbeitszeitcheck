@@ -16,6 +16,8 @@ declare(strict_types=1);
                         </div>
                     </header>
                     <div class="azc-card__body">
+					<input type="hidden" id="hrNotificationRevision" name="hrNotificationRevision"
+						value="<?php p((string)($settings['hrNotificationRevision'] ?? '')); ?>">
 					<h3 id="block-hr-setup-heading" class="admin-settings-subsection__title"><?php p($l->t('General HR notification setup')); ?></h3>
 					<div class="form-group">
 						<div class="form-checkbox">

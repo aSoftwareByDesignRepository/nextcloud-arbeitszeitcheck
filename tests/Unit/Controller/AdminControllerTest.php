@@ -582,6 +582,150 @@ class AdminControllerTest extends TestCase
 		$this->assertSame('1', $store['auto_compliance_check']);
 	}
 
+	/**
+	 * Read the private CAS hash the page render embeds — drift-free
+	 * capture of "what this tab rendered" for revision round-trips.
+	 */
+	private function currentAdminSettingsRevision(): string
+	{
+		$m = new \ReflectionMethod(AdminController::class, 'adminSettingsRevision');
+		$m->setAccessible(true);
+		return $m->invoke($this->controller);
+	}
+
+	private function stubAppConfigStore(array &$store): void
+	{
+		$this->appConfig->method('getAppValueString')
+			->willReturnCallback(function ($key, $default = '') use (&$store): string {
+				return $store[(string)$key] ?? (string)$default;
+			});
+		$this->appConfig->method('setAppValueString')
+			->willReturnCallback(function ($key, $value, $lazy = false, $sensitive = false) use (&$store): bool {
+				unset($lazy, $sensitive);
+				$store[(string)$key] = (string)$value;
+				return true;
+			});
+	}
+
+	public function testUpdateAdminSettingsStaleRevisionReturns409BeforeWrites(): void
+	{
+		$store = ['retention_period' => '2'];
+		$this->stubAppConfigStore($store);
+		$this->request->method('getParams')->willReturn([
+			'settings_section' => 'retention',
+			'retentionPeriod' => 5,
+			'adminSettingsRevision' => 'stale-revision-token',
+		]);
+
+		$response = $this->controller->updateAdminSettings();
+		$this->assertSame(\OCP\AppFramework\Http::STATUS_CONFLICT, $response->getStatus());
+		$data = $response->getData();
+		$this->assertFalse($data['success']);
+		$this->assertSame('ADMIN_SETTINGS_CONFLICT', $data['code']);
+		// No covered key may have been written — the 409 precedes the loop.
+		$this->assertSame('2', $store['retention_period']);
+	}
+
+	public function testUpdateAdminSettingsConcurrentWriteInvalidatesRevision(): void
+	{
+		$store = ['retention_period' => '2'];
+		$this->stubAppConfigStore($store);
+		// The tab rendered at this revision...
+		$renderedRevision = $this->currentAdminSettingsRevision();
+		// ...then a second admin saved something else in the meantime.
+		$store['default_working_hours'] = '7.5';
+
+		$this->request->method('getParams')->willReturn([
+			'settings_section' => 'retention',
+			'retentionPeriod' => 5,
+			'adminSettingsRevision' => $renderedRevision,
+		]);
+
+		$response = $this->controller->updateAdminSettings();
+		$this->assertSame(\OCP\AppFramework\Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('ADMIN_SETTINGS_CONFLICT', $response->getData()['code']);
+		$this->assertSame('2', $store['retention_period']);
+	}
+
+	public function testUpdateAdminSettingsCurrentRevisionPasses(): void
+	{
+		$store = ['retention_period' => '2'];
+		$this->stubAppConfigStore($store);
+		$this->request->method('getParams')->willReturn([
+			'settings_section' => 'retention',
+			'retentionPeriod' => 5,
+			'adminSettingsRevision' => $this->currentAdminSettingsRevision(),
+		]);
+
+		$response = $this->controller->updateAdminSettings();
+		$data = $response->getData();
+		$this->assertTrue($data['success'], 'Response: ' . json_encode($data));
+		$this->assertSame('5', $store['retention_period']);
+		// The response hands back the fresh token for the next save.
+		$this->assertSame($this->currentAdminSettingsRevision(), $data['settings']['adminSettingsRevision']);
+		$this->assertArrayHasKey('workforcePolicy', $data['settings']);
+	}
+
+	public function testUpdateAdminSettingsWithoutRevisionTokenStillAllowed(): void
+	{
+		$store = ['retention_period' => '2'];
+		$this->stubAppConfigStore($store);
+		$this->request->method('getParams')->willReturn([
+			'settings_section' => 'retention',
+			'retentionPeriod' => 5,
+		]);
+
+		$response = $this->controller->updateAdminSettings();
+		$data = $response->getData();
+		$this->assertTrue($data['success'], 'Response: ' . json_encode($data));
+		$this->assertSame('5', $store['retention_period']);
+	}
+
+	public function testUpdateAdminSettingsStaleRevisionBlocksTimeCaptureWrite(): void
+	{
+		$store = ['retention_period' => '2'];
+		$this->stubAppConfigStore($store);
+		$this->request->method('getParams')->willReturn([
+			'settings_section' => 'time-recording',
+			'clockStampingEnabled' => false,
+			'adminSettingsRevision' => 'stale-revision-token',
+		]);
+		// The CAS must fire BEFORE the service write — a stale tab may never
+		// reach setOrganizationDefaults.
+		$this->timeCaptureMethodService->expects($this->never())
+			->method('setOrganizationDefaults');
+
+		$response = $this->controller->updateAdminSettings();
+		$this->assertSame(\OCP\AppFramework\Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('ADMIN_SETTINGS_CONFLICT', $response->getData()['code']);
+	}
+
+	public function testUpdateAdminSettingsTimeCaptureWriteInvalidatesRevision(): void
+	{
+		$store = [];
+		$this->stubAppConfigStore($store);
+		$clockEnabled = true;
+		$this->timeCaptureMethodService->method('isOrganizationClockStampingEnabled')
+			->willReturnCallback(function () use (&$clockEnabled) {
+				return $clockEnabled;
+			});
+		$this->timeCaptureMethodService->method('isOrganizationManualTimeEntryEnabled')
+			->willReturn(true);
+		$renderedRevision = $this->currentAdminSettingsRevision();
+		// A second admin flips the org capture flag in the meantime — the
+		// render-side accessor changes, so the rendered revision must go stale.
+		$clockEnabled = false;
+		$this->request->method('getParams')->willReturn([
+			'settings_section' => 'time-recording',
+			'clockStampingEnabled' => true,
+			'adminSettingsRevision' => $renderedRevision,
+		]);
+
+		$response = $this->controller->updateAdminSettings();
+		$this->assertSame(\OCP\AppFramework\Http::STATUS_CONFLICT, $response->getStatus());
+		$this->assertSame('ADMIN_SETTINGS_CONFLICT', $response->getData()['code']);
+	}
+
 	public function testNotificationsReturnsTemplate(): void
 	{
 		$this->appConfig->method('getAppValueString')

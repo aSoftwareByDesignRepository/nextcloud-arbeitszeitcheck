@@ -35,7 +35,11 @@ function seedDay(uid, stamp) {
 		const d = new Date('2026-11-02T00:00:00Z') // Mon, before DST edge cases
 		d.setUTCDate(d.getUTCDate() + ((stamp + i) % 22))
 		const day = d.toISOString().slice(0, 10)
-		if (Number(sql(`SELECT COUNT(*) FROM oc_at_entries WHERE user_id='${uid}' AND start_time LIKE '${day} %'`)) === 0) {
+		// Overlap probe, not start-of-day probe: an overnight entry ending on
+		// `day` (leaked overnight-daily-maximum rows do exactly this) collides
+		// with the same-day correction candidate while evading a
+		// `start_time LIKE 'day %'` count. NULL end_time = open entry = overlap.
+		if (Number(sql(`SELECT COUNT(*) FROM oc_at_entries WHERE user_id='${uid}' AND start_time < '${day} 23:59:59' AND (end_time IS NULL OR end_time > '${day} 00:00:00')`)) === 0) {
 			return day
 		}
 	}

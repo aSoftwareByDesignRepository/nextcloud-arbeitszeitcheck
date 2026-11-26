@@ -1907,8 +1907,10 @@ class AdminController extends Controller
 		$pageTitle = $found
 			? $displayName
 			: $this->l10n->t('Employee not found');
+		// Found profiles put User ID and Status under the name (page header slot).
+		// The old review sentence is not shown. Unknown accounts keep a not-found lead.
 		$pageHelp = $found
-			? $this->l10n->t('Review and update this employee’s work schedule, vacation, overtime, and time recording settings.')
+			? ''
 			: $this->l10n->t('The requested employee account could not be found.');
 
 		$response = new TemplateResponse('arbeitszeitcheck', 'admin-user-detail', array_merge(
@@ -2387,6 +2389,21 @@ class AdminController extends Controller
 			return $this->userWorkingTimeAssignmentService()->listForUser($userId);
 		} catch (\Throwable) {
 			return [];
+		}
+	}
+
+	/**
+	 * Deleted planned periods for the profile. Fails soft so an audit
+	 * outage never takes the employee page down.
+	 *
+	 * @return array{entries: list<array<string, mixed>>, truncated: bool}
+	 */
+	private function safeRemovedList(string $userId): array
+	{
+		try {
+			return $this->userWorkingTimeAssignmentService()->listRemovedForUser($userId);
+		} catch (\Throwable) {
+			return ['entries' => [], 'truncated' => false];
 		}
 	}
 
@@ -6320,6 +6337,7 @@ class AdminController extends Controller
 						: '',
 					'userWorkingTimeModel' => $currentModel ? $this->presentUserWorkingTimeModelSummary($currentModel->getSummary()) : null,
 					'workingTimeModelAssignments' => $this->safeAssignmentsList($userId),
+					'removedWorkSchedulePeriods' => $this->safeRemovedList($userId),
 					'vacationPolicy' => $policy ? [
 						'id' => $policy->getId(),
 						'vacationMode' => $policy->getVacationMode(),
@@ -8443,6 +8461,10 @@ class AdminController extends Controller
 					$policy->setCreatedAt($this->timeZoneService()->nowInStorage());
 					$policy->setUpdatedAt($this->timeZoneService()->nowInStorage());
 					$errors = $policy->validate();
+					// A manual exception still needs a reason before it can be saved.
+					// The day count does not depend on that text, so the preview
+					// must run while the reason field is still empty.
+					unset($errors['overrideReason']);
 					if (!empty($errors)) {
 						$translatedErrors = [];
 						foreach ($errors as $field => $message) {

@@ -280,8 +280,35 @@
   border-radius: var(--border-radius, 4px);
 }
 
-.admin-user-detail__back-link:hover {
+.admin-user-detail__back-link:hover,
+.admin-user-detail__back-link:focus {
+  text-decoration: none;
+}
+
+/* Family link rule is #app-content-wrapper a:not(...) { text-decoration: underline }.
+   One id loses to that chain of :not() classes, so this needs two ids.
+   none on the icon span cannot cancel a decoration painted by the link. */
+#app-content.azc-app--admin-user-detail #app-content-wrapper a.admin-user-detail__back-link,
+#app-content.azc-app--admin-user-detail #app-content-wrapper a.admin-user-detail__back-link:hover,
+#app-content.azc-app--admin-user-detail #app-content-wrapper a.admin-user-detail__back-link:focus,
+#app-content.azc-app--admin-user-detail #app-content-wrapper a.admin-user-detail__back-link:focus-visible {
+  text-decoration: none;
+}
+
+.admin-user-detail__back-icon {
+  text-decoration: none;
+}
+
+/* Underline the words only. The arrow is decoration (aria-hidden). */
+.admin-user-detail__back-label {
   text-decoration: underline;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+
+.admin-user-detail__back-link:hover .admin-user-detail__back-label,
+.admin-user-detail__back-link:focus-visible .admin-user-detail__back-label {
+  text-decoration-thickness: 2px;
 }
 
 .admin-user-detail__back-link:focus-visible {
@@ -289,18 +316,48 @@
   outline-offset: 2px;
 }
 
-.admin-user-detail__identity {
-  padding: var(--space-4, 1rem);
-  border: 1px solid var(--color-border, var(--arbeitszeitcheck-color-border));
-  border-radius: var(--border-radius-large, 10px);
-  background: color-mix(in srgb, var(--color-main-background) 92%, var(--color-primary-element) 8%);
+#app-content.azc-app--admin-user-detail .azc-page-header__text h1 {
+  margin-bottom: calc(var(--azc-space-1, 4px) / 2);
 }
 
-.admin-user-detail__name {
-  margin: 0 0 var(--space-3, 0.75rem);
-  font-size: clamp(1.25rem, 2.5vw, 1.5rem);
-  line-height: 1.3;
-  color: var(--color-main-text);
+.azc-page-header__text .admin-user-detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--azc-space-3, 0.75rem) var(--azc-space-6, 2rem);
+  margin-top: calc(var(--azc-space-2, 8px) / 2);
+  max-width: 40rem;
+}
+
+.azc-page-header__text .admin-user-detail__meta-item {
+  flex: 0 1 auto;
+  min-width: 8rem;
+}
+
+/* Header names stay for screen readers. The meta dt rule sets width:auto,
+   which would paint the words; this wins that rule. */
+#app-content.azc-app .admin-user-detail__meta-item dt.azc-sr-only {
+  width: 1px;
+  max-width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* The contract-hours row is a 44px target, so the words sat in the top of
+   that box and the help started a full line below them. Pin the words to
+   the bottom of the target and close the flex gap under them. */
+#app-content.azc-app--admin-user-detail .user-custom-model {
+  gap: var(--azc-space-1, 4px);
+}
+
+#app-content.azc-app--admin-user-detail .user-custom-model__toggle {
+  display: flex;
+  align-items: flex-end;
+}
+
+#app-content.azc-app--admin-user-detail .user-custom-model__toggle + .form-help {
+  margin-top: 0;
 }
 
 .admin-user-detail__meta {
@@ -442,26 +499,36 @@
 
 .admin-user-detail__kiosk-xref {
   margin-top: var(--space-2, 0.5rem);
-  padding: var(--space-4, 1rem);
+  padding: 0;
   border: 1px solid var(--color-border, var(--arbeitszeitcheck-color-border));
   border-radius: var(--border-radius-large, 10px);
-  background: color-mix(in srgb, var(--color-main-background) 92%, var(--color-primary-element) 8%);
+  background: var(--color-main-background);
+  overflow: clip;
 }
 
-.admin-user-detail__kiosk-xref-title {
-  margin: 0 0 var(--space-2, 0.5rem);
+#app-content.azc-app--admin-user-detail .admin-user-detail__kiosk-xref-title {
+  margin: 0;
+  min-height: 3rem;
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  display: flex;
+  align-items: center;
   font-size: var(--arbeitszeitcheck-font-size-base, 1rem);
+  font-weight: 600;
   color: var(--color-main-text);
+  background: color-mix(in srgb, var(--color-main-background) 94%, var(--color-text-maxcontrast) 6%);
 }
 
 .admin-user-detail__kiosk-xref-text {
-  margin: 0 0 var(--space-3, 0.75rem);
+  margin: 0;
+  padding: var(--space-4, 1rem) var(--space-4, 1rem) 0;
+  border-top: 1px solid var(--color-border, var(--arbeitszeitcheck-color-border));
   line-height: 1.5;
   color: var(--color-main-text);
 }
 
 .admin-user-detail__kiosk-xref-actions {
   margin: 0;
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem) var(--space-4, 1rem);
 }
 
 .admin-user-detail__kiosk-xref-actions .btn {
@@ -501,6 +568,7 @@
   border-radius: var(--border-radius-large, 10px);
   background: var(--color-main-background);
   overflow: clip;
+  scroll-margin-bottom: 6rem;
 }
 
 .admin-user-detail .user-edit-section__summary {
@@ -541,8 +609,54 @@
 
 .admin-user-detail .form-group {
   margin-bottom: 0;
-  /* Keep form controls readable on ultrawide; page root stays full-bleed. */
+  /* Keep form controls readable on ultrawide; page root stays full-bleed.
+     The two-column grid below drops this cap so each column shares the row. */
   max-width: min(40rem, 100%);
+}
+
+.admin-user-detail .user-edit-section__body .form-input,
+.admin-user-detail .user-edit-section__body .form-select,
+.admin-user-detail .user-edit-section__body .form-textarea,
+.admin-user-detail .user-overtime-adjust__more-body .form-input,
+.admin-user-detail .user-overtime-adjust__more-body .form-select {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/*
+ * Two inputs per row from the family tablet breakpoint up.
+ * One column below 768px. Grid is applied only to an open section and to
+ * a custom-model block that is not hidden, so a closed or hidden group
+ * cannot be forced visible by display:grid.
+ * Guides, capture cards, the weekday schedule, the entitlement preview,
+ * the assignment manager, and the outer custom-model group span both columns.
+ */
+@media (min-width: 768px) {
+  .admin-user-detail details[open] > .user-edit-section__body,
+  .admin-user-detail .user-custom-model__fields:not([hidden]),
+  .admin-user-detail .user-overtime-adjust__more[open] > .user-overtime-adjust__more-body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--azc-space-4, 1rem);
+    row-gap: var(--azc-space-3, 0.75rem);
+    align-items: start;
+  }
+
+  .admin-user-detail details[open] > .user-edit-section__body > .form-group,
+  .admin-user-detail .user-custom-model__fields:not([hidden]) > .form-group,
+  .admin-user-detail .user-overtime-adjust__more[open] > .user-overtime-adjust__more-body > .form-group {
+    max-width: none;
+    min-width: 0;
+  }
+
+  .admin-user-detail details[open] > .user-edit-section__body > :not(.form-group),
+  .admin-user-detail details[open] > .user-edit-section__body > .user-custom-model,
+  .admin-user-detail details[open] > .user-edit-section__body > .form-group:has(.entitlement-preview),
+  .admin-user-detail .user-custom-model__fields:not([hidden]) > .wtm-weekday-schedule,
+  .admin-user-detail .user-overtime-adjust__more[open] > .user-overtime-adjust__more-body > :not(.form-group) {
+    grid-column: 1 / -1;
+  }
 }
 
 .admin-user-detail .entitlement-preview {
@@ -639,14 +753,9 @@
   font-size: var(--arbeitszeitcheck-font-size-sm, 0.875rem);
 }
 
-.admin-user-detail .form-group.is-disabled {
-  opacity: 0.65;
-}
-
-.admin-user-detail .form-group.is-disabled .form-input,
-.admin-user-detail .form-group.is-disabled .form-select,
-.admin-user-detail .form-group.is-disabled .form-textarea {
-  pointer-events: none;
+/* .form-group { display: flex } would otherwise paint a hidden group. */
+#app-content.azc-app--admin-user-detail .form-group[hidden] {
+  display: none;
 }
 
 .admin-user-detail .user-edit-capture__intro {
@@ -753,9 +862,8 @@ body[data-theme-dark-highcontrast] .admin-user-detail .form-select option {
   color: var(--color-main-text);
 }
 
-/* Sticky save bar */
-.admin-user-detail .form-actions,
-.admin-user-detail__actions {
+/* In-section action rows (reset balance). Not sticky. */
+.admin-user-detail .form-actions {
   display: flex;
   flex-direction: row-reverse;
   flex-wrap: wrap;
@@ -763,13 +871,52 @@ body[data-theme-dark-highcontrast] .admin-user-detail .form-select option {
   justify-content: flex-end;
   gap: var(--space-3, 0.75rem);
   margin-top: var(--space-2, 0.5rem);
-  padding: var(--space-4, 1rem);
-  border: 1px solid var(--color-border, var(--arbeitszeitcheck-color-border));
-  border-radius: var(--border-radius-large, 10px);
+  position: static;
+}
+
+/*
+ * Save bar. Flush to the content column: no left, right, or bottom margin.
+ * width:auto so the negative inline margins are not cancelled by width:100%.
+ * --azc-page-end and #app-content padding-bottom are 0, otherwise the shell
+ * end inset leaves a gap under a bar docked at bottom:0.
+ * The side navigation stays uncovered because the bar only cancels shell padding.
+ */
+#app-content.azc-app--admin-user-detail {
+  --azc-page-end: 0px;
+  padding-bottom: 0;
+}
+
+/* The shell is a stretched flex child of the scrollport, so its box stays
+   viewport-tall and sticky cannot travel the page. Let this page's shell
+   grow with the profile. min-height 100% still fills a short profile. */
+#app-content.azc-app--admin-user-detail #app-content-wrapper.azc-shell {
+  align-self: flex-start;
+  flex: none;
+  width: 100%;
+  height: auto;
+  min-height: 100%;
+}
+
+#app-content.azc-app--admin-user-detail .admin-user-detail__actions {
+  display: flex;
+  flex-direction: row-reverse;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3, 0.75rem);
   position: sticky;
-  bottom: 0.5rem;
-  z-index: 2;
+  bottom: 0;
+  z-index: 5;
+  margin: 0 calc(-1 * var(--azc-space-5, 24px)) 0;
+  padding: var(--azc-space-4, 1rem) var(--azc-space-5, 24px)
+    calc(var(--azc-space-4, 1rem) + env(safe-area-inset-bottom, 0px));
+  width: auto;
   background: var(--color-main-background);
+  border-top: 1px solid var(--azc-border, var(--color-border));
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0;
   box-shadow: 0 -4px 12px color-mix(in srgb, var(--color-box-shadow) 8%, transparent);
 }
 
@@ -807,18 +954,16 @@ body[data-theme-dark-highcontrast] .admin-user-detail .form-select option {
 
 @media (max-width: 768.98px) {
   .admin-user-detail .user-edit-section__body,
-  .admin-user-detail__identity,
   .admin-user-detail__howto-body {
     padding: var(--space-3, 0.75rem);
   }
 
-  .admin-user-detail .form-actions {
+  #app-content.azc-app--admin-user-detail .admin-user-detail__actions {
     flex-direction: column;
-    bottom: 0;
-    border-radius: var(--border-radius-large, 10px) var(--border-radius-large, 10px) 0 0;
+    align-items: stretch;
   }
 
-  .admin-user-detail .form-actions .btn {
+  #app-content.azc-app--admin-user-detail .admin-user-detail__actions .btn {
     width: 100%;
   }
 
@@ -848,17 +993,16 @@ body[data-theme-dark-highcontrast] .admin-user-detail .form-select option {
 .user-overtime-adjust__more-summary {
   cursor: pointer;
   min-height: var(--azc-touch, 44px);
-  display: inline-flex;
-  align-items: center;
+  display: list-item;
+  list-style: disclosure-closed outside;
   font-weight: 600;
   color: var(--azc-text, var(--color-main-text));
   border-radius: var(--azc-radius-sm, 6px);
   padding-inline: var(--azc-space-2, 0.5rem);
-  list-style: none;
 }
 
-.user-overtime-adjust__more-summary::-webkit-details-marker {
-  display: none;
+.user-overtime-adjust__more[open] > .user-overtime-adjust__more-summary {
+  list-style-type: disclosure-open;
 }
 
 .user-overtime-adjust__more-summary:focus-visible {
@@ -1010,6 +1154,30 @@ body[data-theme-dark-highcontrast] .admin-user-detail .form-select option {
 
 .assignments-manager__warning {
   margin-top: var(--space-2, 0.5rem);
+}
+
+.assignments-removed {
+  margin-top: var(--azc-space-4, 16px);
+  padding-top: var(--azc-space-4, 16px);
+  border-top: 1px solid var(--color-border);
+}
+
+#app-content.azc-app--admin-user-detail .assignments-removed[hidden] {
+  display: none;
+}
+
+.assignments-removed__title {
+  margin: 0 0 var(--azc-space-2, 8px);
+  font-size: var(--azc-fs-sm, 0.875rem);
+  font-weight: 600;
+  color: var(--color-main-text);
+}
+
+.assignments-removed__help,
+.assignments-removed__note {
+  margin: 0 0 var(--azc-space-3, 12px);
+  color: var(--color-text-maxcontrast);
+  font-size: var(--azc-fs-sm, 0.875rem);
 }
 
 .assignments-dialog {

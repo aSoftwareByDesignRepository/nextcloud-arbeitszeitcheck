@@ -151,6 +151,30 @@ class AuditLogMapper extends QBMapper
 	}
 
 	/**
+	 * One employee's rows for one action and one entity type, newest first.
+	 *
+	 * Callers that show this on a profile must not use {@see findByUser}
+	 * (every action) or {@see findByAction} (every employee).
+	 *
+	 * @return AuditLog[]
+	 */
+	public function findByUserAction(string $userId, string $action, string $entityType, int $limit): array
+	{
+		$limit = max(1, $limit);
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+			->andWhere($qb->expr()->eq('action', $qb->createNamedParameter($action)))
+			->andWhere($qb->expr()->eq('entity_type', $qb->createNamedParameter($entityType)))
+			->orderBy('created_at', 'DESC')
+			->addOrderBy('id', 'DESC')
+			->setMaxResults($limit);
+
+		return $this->findEntities($qb);
+	}
+
+	/**
 	 * Find audit logs by entity
 	 *
 	 * @param string $entityType

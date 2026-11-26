@@ -18,6 +18,9 @@ $shellWidthClass = match ($shellWidth) {
 };
 $pageTitle = (string)($_['pageTitle'] ?? '');
 $pageHelp = (string)($_['pageHelp'] ?? '');
+// Escaped HTML printed under the title instead of the lead. Set by the
+// calling template before this include. Empty on every other page.
+$pageHeaderSub = (isset($pageHeaderSub) && is_string($pageHeaderSub)) ? $pageHeaderSub : '';
 $urls = $_['urls'] ?? [];
 $clientHints = $_['clientHints'] ?? ['locale' => 'en-US', 'htmlLang' => 'en-US', 'timezone' => 'UTC'];
 $azcHtmlLang = (string)($clientHints['htmlLang'] ?? $clientHints['locale'] ?? 'en-US');
@@ -102,7 +105,9 @@ $roleSlug = (string)($_['roleSlug'] ?? 'employee');
 				</div>
 				<div class="azc-page-header__text">
 					<h1 id="azc-page-title"><?php p($pageTitle); ?></h1>
-					<?php if ($pageHelp !== ''): ?>
+					<?php if ($pageHeaderSub !== ''): ?>
+						<?php print_unescaped($pageHeaderSub); ?>
+					<?php elseif ($pageHelp !== ''): ?>
 						<?php
 						$helpTrim = trim($pageHelp);
 						$helpLead = $helpTrim;

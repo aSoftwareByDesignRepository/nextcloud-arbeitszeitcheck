@@ -718,6 +718,130 @@ class AdminUserProfileUpdateServiceTest extends TestCase
 		$this->assertTrue($result['unchanged']);
 	}
 
+	public function testProfileSaveDoesNotRewriteAssignmentWindow(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+		$this->workingTimeModelMapper->method('find')->willReturn($this->globalModel(2));
+
+		$assignment = $this->assignmentFor(10, 'alice', 1);
+		$assignment->setEndDate(new \DateTime('2026-12-31'));
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn($assignment);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([$assignment]);
+		$this->userWorkingTimeModelMapper->expects($this->once())
+			->method('update')
+			->willReturnCallback(static fn (UserWorkingTimeModel $row): UserWorkingTimeModel => $row);
+
+		$this->service->applyWorkingTimeModel('alice', [
+			'workingTimeModelId' => 2,
+			'vacationDaysPerYear' => 28,
+			'startDate' => '1999-01-01',
+			'endDate' => '1999-06-01',
+		], 'admin');
+
+		$this->assertSame(2, $assignment->getWorkingTimeModelId());
+		$this->assertSame('2026-01-01', $assignment->getStartDate()->format('Y-m-d'));
+		$this->assertSame('2026-12-31', $assignment->getEndDate()->format('Y-m-d'));
+	}
+
+	public function testProfileSaveStartsFirstAssignmentTodayWhenClientBackdates(): void
+	{
+		$this->userManager->method('get')->willReturn($this->createMock(IUser::class));
+		$this->workingTimeModelMapper->method('find')->willReturn($this->globalModel(9));
+		$this->userWorkingTimeModelMapper->method('findEditableByUser')->willReturn(null);
+		$this->userWorkingTimeModelMapper->method('findByUser')->willReturn([]);
+
+		$inserted = null;
+		$this->userWorkingTimeModelMapper->expects($this->once())
+			->method('insert')
+			->willReturnCallback(function (UserWorkingTimeModel $row) use (&$inserted): UserWorkingTimeModel {
+				$row->setId(11);
+				$inserted = $row;
+
+				return $row;
+			});
+
+		$this->service->applyWorkingTimeModel('alice', [
+			'workingTimeModelId' => 9,
+			'startDate' => '1999-01-01',
+			'endDate' => '1999-12-31',
+		], 'admin');
+
+		$this->assertInstanceOf(UserWorkingTimeModel::class, $inserted);
+		$this->assertSame((new \DateTime('today'))->format('Y-m-d'), $inserted->getStartDate()->format('Y-m-d'));
+		$this->assertNull($inserted->getEndDate());
+	}
+
+	public function testProfileSaveKeepsVacationPolicyWindowWhenClientDrifts(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+
+		$row = new UserVacationPolicyAssignment();
+		$row->setId(5);
+		$row->setUserId('alice');
+		$row->setVacationMode(Constants::VACATION_MODE_MANUAL_FIXED);
+		$row->setManualDays(20.0);
+		$row->setEffectiveFrom(new \DateTime('2024-04-01'));
+		$row->setEffectiveTo(new \DateTime('2024-09-30'));
+		$row->setInheritLowerLayers(false);
+		$row->setCreatedBy('admin');
+		$row->setCreatedAt(new \DateTime());
+		$row->setUpdatedAt(new \DateTime());
+
+		$this->vacationPolicyMapper->method('find')->with(5)->willReturn($row);
+		$this->vacationPolicyMapper->expects($this->never())->method('insert');
+		$this->vacationPolicyMapper->expects($this->once())
+			->method('update')
+			->willReturnCallback(static fn (UserVacationPolicyAssignment $policy): UserVacationPolicyAssignment => $policy);
+
+		$out = $this->service->applyVacationPolicy('alice', [
+			'policyId' => 5,
+			'vacationMode' => Constants::VACATION_MODE_MANUAL_FIXED,
+			'manualDays' => 22,
+			'effectiveFrom' => (new \DateTime('today'))->format('Y-m-d'),
+			'effectiveTo' => null,
+		], 'admin');
+
+		$this->assertTrue($out['updated']);
+		$this->assertSame(5, $out['policyId']);
+		$this->assertSame('2024-04-01', $row->getEffectiveFrom()->format('Y-m-d'));
+		$this->assertSame('2024-09-30', $row->getEffectiveTo()->format('Y-m-d'));
+		$this->assertEquals(22.0, $row->getManualDays());
+	}
+
+	public function testProfileSaveWithoutPolicyDatesUpdatesCurrentPolicyInPlace(): void
+	{
+		$this->userManager->method('get')->with('alice')->willReturn($this->createMock(IUser::class));
+
+		$row = new UserVacationPolicyAssignment();
+		$row->setId(8);
+		$row->setUserId('alice');
+		$row->setVacationMode(Constants::VACATION_MODE_MANUAL_FIXED);
+		$row->setManualDays(20.0);
+		$row->setEffectiveFrom(new \DateTime('2024-04-01'));
+		$row->setEffectiveTo(new \DateTime('2024-09-30'));
+		$row->setInheritLowerLayers(false);
+		$row->setCreatedBy('admin');
+		$row->setCreatedAt(new \DateTime());
+		$row->setUpdatedAt(new \DateTime());
+
+		$this->vacationPolicyMapper->method('findCurrentByUser')->willReturn($row);
+		$this->vacationPolicyMapper->expects($this->never())->method('insert');
+		$this->vacationPolicyMapper->expects($this->once())
+			->method('update')
+			->willReturnCallback(static fn (UserVacationPolicyAssignment $policy): UserVacationPolicyAssignment => $policy);
+
+		$out = $this->service->applyVacationPolicy('alice', [
+			'vacationMode' => Constants::VACATION_MODE_MANUAL_FIXED,
+			'manualDays' => 21,
+		], 'admin');
+
+		$this->assertTrue($out['updated']);
+		$this->assertSame(8, $out['policyId']);
+		$this->assertSame('2024-04-01', $row->getEffectiveFrom()->format('Y-m-d'));
+		$this->assertSame('2024-09-30', $row->getEffectiveTo()->format('Y-m-d'));
+		$this->assertEquals(21.0, $row->getManualDays());
+	}
+
 	public function testApplyVacationPolicyRejectsDanglingTariffRuleSetOnManualMode(): void
 	{
 		$user = $this->createMock(IUser::class);

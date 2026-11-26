@@ -24,6 +24,38 @@ $detailEnabled = !empty($_['detailEnabled']);
 $kioskCredentialsUrl = (string)($_['kioskCredentialsUrl'] ?? ($urlGenerator
 	? $urlGenerator->linkToRoute('arbeitszeitcheck.kiosk_admin.index') . '#azc-kiosk-creds-heading'
 	: '#'));
+
+$pageHeaderSub = '';
+if ($detailUserFound) {
+	// Identity replaces the review lead. Clear it even if the controller still sends one.
+	$_['pageHelp'] = '';
+	ob_start();
+	?>
+	<dl class="admin-user-detail__meta">
+		<div class="admin-user-detail__meta-item">
+			<dt class="azc-sr-only"><?php p($l->t('User ID')); ?></dt>
+			<dd><code><?php p($detailUserId); ?></code></dd>
+		</div>
+		<?php if ($detailEmail !== ''): ?>
+			<div class="admin-user-detail__meta-item">
+				<dt><?php p($l->t('Email')); ?></dt>
+				<dd><?php p($detailEmail); ?></dd>
+			</div>
+		<?php endif; ?>
+		<div class="admin-user-detail__meta-item">
+			<dt class="azc-sr-only"><?php p($l->t('Status')); ?></dt>
+			<dd>
+				<?php if ($detailEnabled): ?>
+					<span class="badge badge--success"><?php p($l->t('Enabled')); ?></span>
+				<?php else: ?>
+					<span class="badge badge--error"><?php p($l->t('Disabled')); ?></span>
+				<?php endif; ?>
+			</dd>
+		</div>
+	</dl>
+	<?php
+	$pageHeaderSub = (string)ob_get_clean();
+}
 ?>
 
 <?php include __DIR__ . '/common/page-start.php'; ?>
@@ -32,8 +64,8 @@ $kioskCredentialsUrl = (string)($_['kioskCredentialsUrl'] ?? ($urlGenerator
 
 	<nav class="admin-user-detail__back" aria-label="<?php p($l->t('Breadcrumb')); ?>">
 		<a class="admin-user-detail__back-link" href="<?php p($employeesListUrl); ?>">
-			<span aria-hidden="true">←</span>
-			<?php p($l->t('Back to employees')); ?>
+			<span class="admin-user-detail__back-icon" aria-hidden="true">←</span>
+			<span class="admin-user-detail__back-label"><?php p($l->t('Back to employees')); ?></span>
 		</a>
 	</nav>
 
@@ -60,33 +92,6 @@ $kioskCredentialsUrl = (string)($_['kioskCredentialsUrl'] ?? ($urlGenerator
 			</div>
 		</section>
 	<?php else: ?>
-		<header class="admin-user-detail__identity" aria-label="<?php p($l->t('Employee profile')); ?>">
-			<div class="admin-user-detail__identity-main">
-				<dl class="admin-user-detail__meta">
-					<div class="admin-user-detail__meta-item">
-						<dt><?php p($l->t('User ID')); ?></dt>
-						<dd><code><?php p($detailUserId); ?></code></dd>
-					</div>
-					<?php if ($detailEmail !== ''): ?>
-						<div class="admin-user-detail__meta-item">
-							<dt><?php p($l->t('Email')); ?></dt>
-							<dd><?php p($detailEmail); ?></dd>
-						</div>
-					<?php endif; ?>
-					<div class="admin-user-detail__meta-item">
-						<dt><?php p($l->t('Status')); ?></dt>
-						<dd>
-							<?php if ($detailEnabled): ?>
-								<span class="badge badge--success"><?php p($l->t('Enabled')); ?></span>
-							<?php else: ?>
-								<span class="badge badge--error"><?php p($l->t('Disabled')); ?></span>
-							<?php endif; ?>
-						</dd>
-					</div>
-				</dl>
-			</div>
-		</header>
-
 		<details class="admin-user-detail__howto">
 			<summary class="admin-user-detail__howto-summary">
 				<?php p($l->t('How to edit this employee')); ?>
@@ -103,13 +108,12 @@ $kioskCredentialsUrl = (string)($_['kioskCredentialsUrl'] ?? ($urlGenerator
 
 		<nav class="admin-user-detail__toc" aria-label="<?php p($l->t('Jump to section')); ?>">
 			<a class="admin-user-detail__toc-link" href="#user-edit-assignment"><?php p($l->t('Work schedule')); ?></a>
+			<a class="admin-user-detail__toc-link" href="#user-edit-assignments"><?php p($l->t('Work schedule periods')); ?></a>
 			<a class="admin-user-detail__toc-link" href="#user-edit-capture"><?php p($l->t('Time recording')); ?></a>
+			<a class="admin-user-detail__toc-link" href="#user-edit-employment"><?php p($l->t('Employment period (for pro-rata vacation)')); ?></a>
 			<a class="admin-user-detail__toc-link" href="#user-edit-vacation"><?php p($l->t('Vacation days')); ?></a>
 			<a class="admin-user-detail__toc-link" href="#user-edit-overtime"><?php p($l->t('Overtime balance')); ?></a>
-			<a class="admin-user-detail__toc-link" href="#user-edit-validity"><?php p($l->t('Valid from')); ?></a>
-			<a class="admin-user-detail__toc-link" href="#user-edit-employment"><?php p($l->t('Employment period (for pro-rata vacation)')); ?></a>
 			<a class="admin-user-detail__toc-link" href="#user-edit-datev"><?php p($l->t('DATEV Personalnummer')); ?></a>
-			<a class="admin-user-detail__toc-link" href="#assignment-history"><?php p($l->t('Work schedule history')); ?></a>
 			<a class="admin-user-detail__toc-link" href="#user-kiosk-credentials"><?php p($l->t('Badges & PIN')); ?></a>
 		</nav>
 

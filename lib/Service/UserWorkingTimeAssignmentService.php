@@ -56,6 +56,9 @@ final class UserWorkingTimeAssignmentService
 	public const ERROR_VALIDATION = 'ASSIGNMENT_VALIDATION';
 	public const MAX_ROWS_PER_USER = 500;
 
+	/** Newest deletions shown under the periods table. One extra row detects truncation. */
+	public const REMOVED_LIST_LIMIT = 50;
+
 	private const MIN_DATE = '1970-01-01';
 	private const MAX_DATE = '2100-12-31';
 
@@ -96,6 +99,55 @@ final class UserWorkingTimeAssignmentService
 			$out[] = $this->assignmentWireShape($row);
 		}
 		return $out;
+	}
+
+	/**
+	 * Planned periods that were deleted before they started.
+	 *
+	 * Ended periods stay in {@see listForUser}. This list is only the
+	 * hard-delete audit, so a removal stays visible after the row is gone.
+	 * The query is scoped, and each row is checked again so a mapper bug
+	 * cannot leak another employee, another action, or the raw audit JSON.
+	 *
+	 * @return array{entries: list<array<string, mixed>>, truncated: bool}
+	 */
+	public function listRemovedForUser(string $userId): array
+	{
+		$raw = $this->auditLogMapper->findByUserAction(
+			$userId,
+			'user_working_time_model_deleted',
+			'user_working_time_model',
+			self::REMOVED_LIST_LIMIT + 1
+		);
+		$truncated = count($raw) > self::REMOVED_LIST_LIMIT;
+		$entries = [];
+		foreach ($raw as $log) {
+			if (!$log instanceof \OCA\ArbeitszeitCheck\Db\AuditLog) {
+				continue;
+			}
+			// removed-list: the query is already scoped; this is the leak stop.
+			if ($log->getAction() !== 'user_working_time_model_deleted') {
+				continue;
+			}
+			if ($log->getUserId() !== $userId) {
+				continue;
+			}
+			if ($log->getEntityType() !== 'user_working_time_model') {
+				continue;
+			}
+			$entry = $this->removedEntryFromLog($log);
+			if ($entry !== null) {
+				$entries[] = $entry;
+			}
+		}
+		usort($entries, static function (array $a, array $b): int {
+			return [$b['removed_at'] ?? '', $b['id']] <=> [$a['removed_at'] ?? '', $a['id']];
+		});
+		if (count($entries) > self::REMOVED_LIST_LIMIT) {
+			$entries = array_slice($entries, 0, self::REMOVED_LIST_LIMIT);
+		}
+
+		return ['entries' => array_values($entries), 'truncated' => $truncated];
 	}
 
 	/**
@@ -404,7 +456,7 @@ final class UserWorkingTimeAssignmentService
 	 * DELETE: only for never-effective windows (start > today). A started
 	 * window is history — ending it is a PATCH/end, never a delete (BQ-05).
 	 *
-	 * @return array{deleted: bool, assignment_changed: bool}
+	 * @return array{deleted: bool, assignment_changed: bool, removed: ?array<string, mixed>}
 	 */
 	public function deleteAssignment(string $userId, int $assignmentId, string $performedBy): array
 	{
@@ -426,7 +478,7 @@ final class UserWorkingTimeAssignmentService
 					}
 					$oldValues = $this->userWorkingTimeModelToAuditValues($fresh);
 					$this->userWorkingTimeModelMapper->delete($fresh);
-					$this->auditLogMapper->logAction(
+					$audit = $this->auditLogMapper->logAction(
 						$userId,
 						'user_working_time_model_deleted',
 						'user_working_time_model',
@@ -435,8 +487,9 @@ final class UserWorkingTimeAssignmentService
 						null,
 						$performedBy
 					);
+					$removed = $this->removedEntryFromLog($audit);
 					$this->pruneOrphanedPersonalModels($userId, $performedBy);
-					return ['deleted' => true, 'assignment_changed' => true];
+					return ['deleted' => true, 'assignment_changed' => true, 'removed' => $removed];
 				}, $this->db);
 			} finally {
 				$this->releaseClosureLocks();
@@ -1021,6 +1074,18 @@ final class UserWorkingTimeAssignmentService
 
 	private function userWorkingTimeModelToAuditValues(UserWorkingTimeModel $model): array
 	{
+		// Captured at delete time: a personal model may be pruned in the same
+		// transaction, so a later name lookup would have nothing left to read.
+		$catalogName = null;
+		$catalogIsPersonal = false;
+		try {
+			$catalog = $this->workingTimeModelMapper->find((int)$model->getWorkingTimeModelId());
+			$catalogIsPersonal = $catalog->isPersonal();
+			$catalogName = $catalogIsPersonal ? null : $catalog->getName();
+		} catch (\Throwable) {
+			// The name is resolved again when the removal is shown.
+		}
+
 		return [
 			'id' => $model->getId(),
 			'userId' => $model->getUserId(),
@@ -1028,7 +1093,87 @@ final class UserWorkingTimeAssignmentService
 			'vacationDaysPerYear' => $model->getVacationDaysPerYear(),
 			'startDate' => $model->getStartDate()?->format('Y-m-d'),
 			'endDate' => $model->getEndDate()?->format('Y-m-d'),
+			'modelName' => $catalogName,
+			'modelIsPersonal' => $catalogIsPersonal,
 		];
+	}
+
+	/**
+	 * Profile wire for one deletion. Null when the stored snapshot cannot
+	 * describe a period. IP, user agent, and the raw JSON never leave here.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	private function removedEntryFromLog(\OCA\ArbeitszeitCheck\Db\AuditLog $log): ?array
+	{
+		$raw = $log->getOldValues();
+		$old = is_string($raw) && $raw !== '' ? json_decode($raw, true) : null;
+		if (!is_array($old)) {
+			return null;
+		}
+		$start = $this->ymdOrNull($old['startDate'] ?? null);
+		if ($start === null) {
+			return null;
+		}
+		$actorId = trim((string)($log->getPerformedBy() ?? ''));
+		$actor = $actorId !== '' ? $this->userManager->get($actorId) : null;
+		$display = $actor !== null ? trim((string)$actor->getDisplayName()) : '';
+		$who = $display !== '' ? $display : ($actorId !== '' ? $actorId : (string)$this->l10n->t('Unknown'));
+		$when = $log->getCreatedAt();
+		$days = null;
+		if (isset($old['vacationDaysPerYear']) && is_numeric($old['vacationDaysPerYear'])) {
+			$days = $this->storedAmountToAdminDays((float)$old['vacationDaysPerYear']);
+		}
+
+		return [
+			'id' => (int)$log->getId(),
+			'model_name' => $this->removedModelName($old),
+			'start_date' => $start,
+			'end_date' => $this->ymdOrNull($old['endDate'] ?? null),
+			'vacation_days_per_year' => $days,
+			'removed_at' => $when instanceof \DateTimeInterface ? $when->format('Y-m-d H:i:s') : null,
+			'removed_by' => $who,
+		];
+	}
+
+	/**
+	 * @param array<string, mixed> $old
+	 */
+	private function removedModelName(array $old): string
+	{
+		if (!empty($old['modelIsPersonal'])) {
+			return (string)$this->l10n->t('Individual contract');
+		}
+		$stored = isset($old['modelName']) ? trim((string)$old['modelName']) : '';
+		if ($stored !== '') {
+			return $stored;
+		}
+		$modelId = isset($old['workingTimeModelId']) ? (int)$old['workingTimeModelId'] : 0;
+		if ($modelId > 0) {
+			try {
+				$model = $this->workingTimeModelMapper->find($modelId);
+				if ($model->isPersonal()) {
+					return (string)$this->l10n->t('Individual contract');
+				}
+				$name = trim((string)$model->getName());
+				if ($name !== '') {
+					return $name;
+				}
+			} catch (\Throwable) {
+				// Fall through to the deleted label.
+			}
+		}
+
+		return (string)$this->l10n->t('Deleted model');
+	}
+
+	private function ymdOrNull(mixed $value): ?string
+	{
+		if (!is_string($value) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+			return null;
+		}
+
+		return $value;
 	}
 
 	private function workingTimeModelAssignmentMatches(

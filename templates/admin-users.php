@@ -302,7 +302,7 @@ $pageHeaderActions = is_string($compact) ? $compact : (string)$captured;
                                         <td class="actions-cell" data-label="<?php p($l->t('Actions')); ?>">
                                             <div class="user-actions azc-table-actions" role="group" aria-label="<?php p($l->t('Actions for %s', [$user['displayName']])); ?>">
                                                 <a class="azc-btn azc-btn--ghost azc-icon-btn"
-                                                        href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.userDetail', ['userId' => $user['userId']])); ?>#assignment-history"
+                                                        href="<?php p($urlGenerator->linkToRoute('arbeitszeitcheck.admin.userDetail', ['userId' => $user['userId']])); ?>#user-edit-assignments"
                                                         data-action="history-user"
                                                         data-user-id="<?php p($user['userId']); ?>"
                                                         aria-label="<?php p($l->t('View assignment history for %s', [$user['displayName']])); ?>"

@@ -652,7 +652,7 @@
                     const name = user.displayName || user.userId;
                     return `<div class="user-actions azc-table-actions" role="group" aria-label="${Utils.escapeHtml(auMsg('actions', 'Actions') + ': ' + name)}">
                         <a class="azc-btn azc-btn--ghost azc-icon-btn"
-                            href="${Utils.escapeHtml(detailUrl)}#assignment-history"
+                            href="${Utils.escapeHtml(detailUrl)}#user-edit-assignments"
                             data-action="history-user"
                             data-user-id="${Utils.escapeHtml(user.userId)}"
                             aria-label="${Utils.escapeHtml(auMsg('viewHistory', 'View history') + ': ' + name)}"

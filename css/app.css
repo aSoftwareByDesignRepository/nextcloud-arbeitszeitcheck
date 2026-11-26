@@ -1464,6 +1464,14 @@ dialog .azc-icon-btn > svg,
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--azc-space-2);
+	/* Flex item of .azc-callout: min-width:auto would pin the row to the
+	 * widest nowrap button label (de compounds overflow 375px viewports). */
+	min-width: 0;
+}
+#app-content.azc-app .azc-callout__actions .azc-btn,
+.modal-backdrop .azc-callout__actions .azc-btn {
+	white-space: normal;
+	overflow-wrap: break-word;
 }
 #app-content.azc-app .azc-callout__actions .azc-btn--secondary,
 .modal-backdrop .azc-callout__actions .azc-btn--secondary {

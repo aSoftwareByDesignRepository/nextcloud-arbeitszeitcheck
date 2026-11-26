@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "appId": "arbeitszeitcheck",
+  "agentExposure": "none",
+  "tools": [],
+  "notes": "Reviewed: intentionally no agent surface in v1 (spec wave 3). Any future surface needs a mini-spec before tools are declared here."
+}

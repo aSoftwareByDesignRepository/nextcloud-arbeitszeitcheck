@@ -30,7 +30,9 @@ const employeeRoutes = [
 const adminRoutes = [
 	{ id: 'admin-notifications', path: '/apps/arbeitszeitcheck/admin/notifications', ready: '#admin-notifications-form' },
 	{ id: 'admin-overtime', path: '/apps/arbeitszeitcheck/admin/overtime-settings', ready: '#admin-overtime-settings-form' },
-	{ id: 'admin-year-end', path: '/apps/arbeitszeitcheck/admin/year-end', ready: '#azc-year-end' },
+	// The year-end page renders a "feature disabled" callout instead of the
+	// wizard when the workforce policy flag is off — accept either render.
+	{ id: 'admin-year-end', path: '/apps/arbeitszeitcheck/admin/year-end', ready: '#azc-year-end, #ye-disabled-heading' },
 ]
 
 // Manager oversight surface — the quick-filter pills + sort/search labels

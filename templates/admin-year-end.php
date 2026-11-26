@@ -37,6 +37,7 @@ $currentYear = (int)date('Y');
                     <?php
                     $calloutVariant = 'info';
                     $calloutRole = 'status';
+                    $calloutTitleId = 'ye-disabled-heading';
                     $calloutTitle = $l->t('Year-end reset is disabled');
                     $calloutText = $l->t('Enable the guided year-end reset in the workforce policy settings first.');
                     $calloutActions = [[

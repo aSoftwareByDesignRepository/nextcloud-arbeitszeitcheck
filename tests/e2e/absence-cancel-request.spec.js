@@ -91,16 +91,31 @@ async function runningVacation(mgr, userId) {
 	throw new Error('no running approved vacation available (reuse + seed exhausted)')
 }
 
-/** Seed an approved vacation fully in the past (already_ended probing). */
+/** Seed an approved vacation fully in the past (already_ended probing).
+ *  Blocking rows per AbsenceMapper::findOverlapping are pending /
+ *  substitute_pending / approved — read them once and place the seed in
+ *  a verified-free 5-day gap instead of blind 7-day probes (past runs
+ *  carpet exactly the recent windows the probe used; suite #20 hit
+ *  'no free ended vacation seed window' on all 58 tries). */
 async function seedEndedVacation(page, userId) {
 	const today = await serverToday(page)
-	for (let back = 0; back < 400; back += 7) {
+	const list = await apiAllowFailure(page, 'GET',
+		`${APP}/api/manager/employee-absences?employeeId=${userId}&startDate=${shift(today, -1500)}&endDate=${shift(today, -15)}&limit=500`)
+	const blocking = (list.json?.entries ?? [])
+		.filter((a) => ['pending', 'substitute_pending', 'approved'].includes(a.status))
+		.map((a) => [a.startDate, a.endDate])
+	for (let back = 0; back < 1400; back++) {
+		const start = shift(today, -20 - back)
+		const end = shift(today, -15 - back)
+		if (blocking.some(([s, e]) => s <= end && e >= start)) {
+			continue
+		}
 		const res = await apiAllowFailure(page, 'POST', `${APP}/api/manager/employee-absences`, {
 			data: {
 				userId,
 				type: 'unpaid_leave',
-				startDate: shift(today, -20 - back),
-				endDate: shift(today, -15 - back),
+				startDate: start,
+				endDate: end,
 				reason: 'e2e manager-cancel seed',
 			},
 		})

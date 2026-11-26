@@ -907,7 +907,11 @@ body[data-theme-dark-highcontrast] .admin-user-detail .form-select option {
   position: sticky;
   bottom: 0;
   z-index: 5;
-  margin: 0 calc(-1 * var(--azc-space-5, 24px)) 0;
+  /* No negative-margin bleed here: the shell's 24px side padding lives on
+     an ancestor ABOVE #azc-main-content, so -space-5 would push the bar's
+     right edge past main's border box (measured +24px overflow @375). The
+     sibling .admin-users-bulk-bar sticks at column width the same way. */
+  margin: 0;
   padding: var(--azc-space-4, 1rem) var(--azc-space-5, 24px)
     calc(var(--azc-space-4, 1rem) + env(safe-area-inset-bottom, 0px));
   width: auto;

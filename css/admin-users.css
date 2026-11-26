@@ -632,7 +632,7 @@
  * Guides, capture cards, the weekday schedule, the entitlement preview,
  * the assignment manager, and the outer custom-model group span both columns.
  */
-@media (min-width: 768px) {
+@media (min-width: 769px) {
   .admin-user-detail details[open] > .user-edit-section__body,
   .admin-user-detail .user-custom-model__fields:not([hidden]),
   .admin-user-detail .user-overtime-adjust__more[open] > .user-overtime-adjust__more-body {

@@ -219,12 +219,12 @@ class AdminUserDetailLayoutContractTest extends TestCase
 		);
 	}
 
-	public function testSectionFieldsAreTwoColumnsFrom768AndOneBelow(): void
+	public function testSectionFieldsAreTwoColumnsFrom769AndOneBelow(): void
 	{
 		$css = $this->read('css/admin-users.css');
 
 		$this->assertMatchesRegularExpression(
-			'/@media \(min-width: 768px\)\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/s',
+			'/@media \(min-width: 769px\)\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/s',
 			$css,
 		);
 		$this->assertStringContainsString(

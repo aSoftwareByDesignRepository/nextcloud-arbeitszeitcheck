@@ -148,7 +148,8 @@ class ConfigImportCommand extends Command
 			return;
 		}
 		if (($payload['ok'] ?? false) === false) {
-			$io->error((string)($payload['error'] ?? 'FAILED'));
+			$err = $payload['error'] ?? 'FAILED';
+			$io->error(is_scalar($err) ? (string)$err : 'FAILED');
 			return;
 		}
 		$io->success(($payload['applied'] ?? false) ? 'Import applied.' : 'Dry run complete — re-run with --apply to write.');

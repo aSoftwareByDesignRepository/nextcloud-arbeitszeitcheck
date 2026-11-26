@@ -42,6 +42,8 @@ use OCP\Security\Bruteforce\IThrottler;
 
 class TransferApiController extends Controller
 {
+	use ApiTrait;
+
 	private const THROTTLE_ACTION = 'arbeitszeitcheck_transfer_import';
 
 	public function __construct(
@@ -73,7 +75,7 @@ class TransferApiController extends Controller
 	{
 		try {
 			$this->requireAdmin();
-			$passphrase = (string)($this->request->getParam('passphrase', '') ?? '');
+			$passphrase = $this->strParam('passphrase', '');
 			$bytes = $this->transfer->exportContainer($passphrase, false);
 		} catch (\Throwable $e) {
 			return $this->errorFor($e);
@@ -90,7 +92,7 @@ class TransferApiController extends Controller
 	{
 		return $this->guard(function (): array {
 			$user = $this->requireAdmin();
-			$mode = (string)($this->request->getParam('mode', TransferService::MODE_MERGE) ?? TransferService::MODE_MERGE);
+			$mode = $this->strParam('mode', TransferService::MODE_MERGE);
 			if ($mode === TransferService::MODE_REPLACE && !$this->groupManager->isAdmin($user)) {
 				// Early refusal — the mode stays refused at apply too, but a
 				// non-sysadmin should never burn a decrypt on it (FS-2).
@@ -104,7 +106,7 @@ class TransferApiController extends Controller
 			} catch (\Throwable) {
 				throw new TransferException('TRANSFER_THROTTLED', ['retryAfter' => 60]);
 			}
-			$passphrase = (string)($this->request->getParam('passphrase', '') ?? '');
+			$passphrase = $this->strParam('passphrase', '');
 			$bytes = $this->readUpload($this->request->getUploadedFile('file'));
 			try {
 				return $this->transfer->preview($bytes, $passphrase, $mode, $user);
@@ -125,7 +127,7 @@ class TransferApiController extends Controller
 	{
 		return $this->guard(function (): array {
 			$user = $this->requireAdmin();
-			$pendingId = (string)($this->request->getParam('pendingId', '') ?? '');
+			$pendingId = $this->strParam('pendingId', '');
 			// The RECORDED mode gates — a client cannot downgrade a replace
 			// preview into an unconfirmed merge apply.
 			$mode = $this->transfer->pendingMode($pendingId);
@@ -134,7 +136,7 @@ class TransferApiController extends Controller
 				if (!$this->groupManager->isAdmin($user)) {
 					throw new TransferException('TRANSFER_ADMIN_REQUIRED');
 				}
-				if ((string)($this->request->getParam('confirmation', '') ?? '') !== TransferService::REPLACE_TOKEN) {
+				if ($this->strParam('confirmation', '') !== TransferService::REPLACE_TOKEN) {
 					throw new TransferException('TRANSFER_CONFIRM_REQUIRED');
 				}
 				$replaceConfirmed = true;

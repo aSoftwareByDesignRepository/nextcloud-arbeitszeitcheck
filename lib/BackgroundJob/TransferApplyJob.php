@@ -62,10 +62,13 @@ class TransferApplyJob extends QueuedJob
 			return;
 		}
 		try {
+			// args are job-internal, but never let a non-scalar coerce:
+			// (bool)["x"] === true would self-confirm a destructive replace.
+			$replaceConfirmed = ($args['replaceConfirmed'] ?? false) === true;
 			$this->transferService->runApplyJob(
-				(string)($args['pendingId'] ?? ''),
-				(string)($args['actor'] ?? ''),
-				(bool)($args['replaceConfirmed'] ?? false),
+				is_scalar($args['pendingId'] ?? null) ? (string)$args['pendingId'] : '',
+				is_scalar($args['actor'] ?? null) ? (string)$args['actor'] : '',
+				$replaceConfirmed,
 				true, // this job holds the shared backup lock for the whole apply
 			);
 		} finally {

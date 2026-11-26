@@ -139,7 +139,7 @@ final class TransferService
 				$out = [];
 				foreach ($row as $col => $value) {
 					$col = (string)$col;
-					if (isset($spec['secret_columns']) && in_array($col, $spec['secret_columns'], true)) {
+					if (in_array($col, $spec['secret_columns'], true)) {
 						if ($value !== null && $value !== '') {
 							$out[$col] = TransferFormat::REDACTED_MARKER;
 							$secretCols[$col]++;
@@ -371,8 +371,8 @@ final class TransferService
 			'actor' => $actor,
 			'mode' => $mode,
 			'result' => 'failed',
-			'checksum' => (string)($payload['checksum'] ?? ''),
-			'exportedAt' => (string)($header['exported_at'] ?? $payload['exported_at'] ?? ''),
+			'checksum' => self::tstr($payload['checksum'] ?? ''),
+			'exportedAt' => self::tstr($header['exported_at'] ?? $payload['exported_at'] ?? ''),
 			'snapshotId' => null,
 			'counts' => [],
 			'error' => null,
@@ -394,10 +394,16 @@ final class TransferService
 				$receipt['snapshotId'] = $snapshotId;
 			}
 
-			$baselineDangling = $this->danglingReferenceCount();
-
 			$this->db->beginTransaction();
 			try {
+				// Baseline MUST share the apply's snapshot: measured outside the
+				// txn it races concurrent parent deletes committed before the
+				// snapshot — their children count as dangling in the after-check
+				// but not the baseline → false-positive referential_integrity
+				// rollback. Inside the txn both counts see one MVCC snapshot, so
+				// the delta reflects only this apply's own writes.
+				$baselineDangling = $this->danglingReferenceCount();
+
 				$this->receiptStore->setJobState('running', 'config', 40, ['actor' => $actor, 'startedAt' => $startedAt]);
 				$this->applyConfigPlan($plan);
 
@@ -513,17 +519,34 @@ final class TransferService
 	 * @param array<string,mixed> $header
 	 * @return array{report:array<string,mixed>,configWrites:array<string,string>,mirroredWrites:array<string,string>,tablePlan:array<string,mixed>}
 	 */
+	/** Untrusted transfer-file field: scalars only — arrays never coerce. */
+	private static function tstr(mixed $v): string
+	{
+		return is_scalar($v) ? (string)$v : '';
+	}
+
+	private static function tint(mixed $v): int
+	{
+		if (is_int($v)) {
+			return $v;
+		}
+		if (is_string($v) && preg_match('/^-?\d+$/', $v)) {
+			return (int)$v;
+		}
+		return 0;
+	}
+
 	private function buildPlan(array $payload, array $header, string $mode, string $actor): array
 	{
 		$report = [
 			'mode' => $mode,
 			'file' => [
-				'app' => (string)($header['app'] ?? $this->appId),
-				'app_version' => (string)($header['app_version'] ?? ''),
-				'schema_version' => (int)($header['schema_version'] ?? 0),
-				'exported_at' => (string)($header['exported_at'] ?? ''),
-				'source_instance' => (string)($payload['source_instance'] ?? ''),
-				'checksum' => (string)($payload['checksum'] ?? ''),
+				'app' => self::tstr($header['app'] ?? $this->appId),
+				'app_version' => self::tstr($header['app_version'] ?? ''),
+				'schema_version' => self::tint($header['schema_version'] ?? 0),
+				'exported_at' => self::tstr($header['exported_at'] ?? ''),
+				'source_instance' => self::tstr($payload['source_instance'] ?? ''),
+				'checksum' => self::tstr($payload['checksum'] ?? ''),
 			],
 			'warnings' => [],
 			'security' => [],
@@ -538,14 +561,14 @@ final class TransferService
 		];
 
 		// ── warnings (FS-4) ──
-		$sourceInstance = (string)($payload['source_instance'] ?? '');
+		$sourceInstance = self::tstr($payload['source_instance'] ?? '');
 		if ($sourceInstance !== '' && $sourceInstance === (string)$this->config->getSystemValue('instanceid', '')) {
 			$report['warnings'][] = ['code' => 'same_instance', 'detail' => $sourceInstance];
 		}
-		$exportedAt = strtotime((string)($header['exported_at'] ?? '')) ?: 0;
+		$exportedAt = strtotime(self::tstr($header['exported_at'] ?? '')) ?: 0;
 		$lastImport = $this->receiptStore->lastImportAt();
 		if ($exportedAt > 0 && $lastImport > 0 && $exportedAt < $lastImport) {
-			$report['warnings'][] = ['code' => 'stale_file', 'detail' => (string)$header['exported_at']];
+			$report['warnings'][] = ['code' => 'stale_file', 'detail' => self::tstr($header['exported_at'] ?? '')];
 		}
 		if ($mode === self::MODE_REPLACE && !$this->config->getSystemValueBool('maintenance')) {
 			$report['warnings'][] = ['code' => 'maintenance_required', 'detail' => 'occ maintenance:mode --on'];
@@ -555,7 +578,7 @@ final class TransferService
 		$configWrites = [];
 		$mirroredWrites = [];
 		$securityKeys = array_fill_keys($this->hooks->securityRelevantKeys(), true);
-		$sourceUrl = trim((string)($payload['source_url'] ?? ''));
+		$sourceUrl = trim(self::tstr($payload['source_url'] ?? ''));
 
 		$fileConfig = is_array($payload['config'] ?? null) ? $payload['config'] : [];
 		foreach ($fileConfig as $key => $value) {

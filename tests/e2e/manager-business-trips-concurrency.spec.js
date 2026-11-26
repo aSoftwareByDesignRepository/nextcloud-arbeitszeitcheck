@@ -21,13 +21,81 @@ test.use({ trace: 'off' })
 
 const MGR_API = '/apps/arbeitszeitcheck/api/manager/business-trips'
 const PAGE = '/apps/arbeitszeitcheck/manager/business-trips'
+const ADMIN_BT = '/apps/arbeitszeitcheck/api/admin'
 
-/** Unique far-future window per call — trips persist in the dev DB, so
- * fixed dates collide with prior runs (overlap validator). One attempt;
- * returns the trip id, or null when the window is already taken. */
-async function createTripOnce(page, purpose, attempt) {
+/** Unique far-future window per attempt — trips persist in the dev DB, so
+ * fixed dates collide with prior runs (overlap validator). */
+function tripWindowBaseMs(attempt) {
+	return new Date('2028-01-05T00:00:00Z').getTime() + (Date.now() % 280) * 86400000 + Math.floor(Math.random() * 30) * 86400000 + attempt * 86400000 * 45
+}
+
+/** Rule-set coverage for the chosen date. Ambient org assignments cannot
+ * be trusted: each one pins a specific rule-set VERSION, and every
+ * lifecycle spec activation retires the previous version — the rows stay
+ * effective but resolve to dead sets. Provision a bounded USER-scope
+ * assignment (highest scope precedence) on the set that is active right
+ * now. The overlap guard only checks same-user rows: stale ones starting
+ * before the window get truncated at its edge; ones starting inside the
+ * window make the attempt fail so the retry shifts the date +45d (always
+ * past a ≤4d stub). Returns false when coverage cannot be placed. */
+async function ensureUserRuleCoverage(adminPage, employeeUid, baseMs) {
+	const iso = (ms) => new Date(ms).toISOString().slice(0, 10)
+	const sets = (await api(adminPage, 'GET', `${ADMIN_BT}/business-trip-rule-sets`)).items ?? []
+	let active = sets.find((s) => s.status === 'active')
+	if (!active) {
+		const draft = await api(adminPage, 'POST', `${ADMIN_BT}/business-trip-rule-presets/DE`)
+		await api(adminPage, 'POST', `${ADMIN_BT}/business-trip-rule-sets/${draft.item.id}/mark-reviewed`, {
+			data: { configHash: draft.item.configHash },
+		})
+		active = (await api(adminPage, 'POST', `${ADMIN_BT}/business-trip-rule-sets/${draft.item.id}/activate`)).item
+	}
+	const rows = (await api(adminPage, 'GET', `${ADMIN_BT}/business-trip-rule-assignments`)).items ?? []
+	let from = baseMs - 86400000
+	let to = baseMs + 2 * 86400000
+	for (let guard = 0; guard < 10; guard++) {
+		const hit = rows.find((a) => a.scopeType === 'user' && a.scopeId === employeeUid
+			&& a.effectiveFrom <= iso(to) && (!a.effectiveTo || a.effectiveTo >= iso(from)))
+		if (!hit) {
+			break
+		}
+		if (hit.effectiveFrom < iso(from)) {
+			// Row starts before the window — truncate it at the window edge.
+			const ended = await apiAllowFailure(adminPage, 'POST', `${ADMIN_BT}/business-trip-rule-assignments/${hit.id}/end`, {
+				data: { revision: hit.revision, effectiveTo: iso(from - 86400000) },
+			})
+			if (!ended.ok) {
+				return false
+			}
+			hit.effectiveTo = iso(from - 86400000)
+			hit.revision += 1
+			continue
+		}
+		// Row starts inside the window. If it only clips the tail, shrink the
+		// window ahead of it while it still covers both trip days; otherwise
+		// bail — the retry window shifts +45d, past any ≤4d stub.
+		if (hit.effectiveFrom > iso(baseMs + 86400000)) {
+			to = new Date(`${hit.effectiveFrom}T00:00:00Z`).getTime() - 86400000
+			continue
+		}
+		return false
+	}
+	const res = await apiAllowFailure(adminPage, 'POST', `${ADMIN_BT}/business-trip-rule-assignments`, {
+		data: {
+			ruleSetId: active.id,
+			scopeType: 'user',
+			scopeId: employeeUid,
+			priority: 0,
+			effectiveFrom: iso(from),
+			effectiveTo: iso(to),
+		},
+	})
+	return res.ok
+}
+
+/** One attempt; returns the trip id, or null when the window is already
+ * taken. */
+async function createTripOnce(page, purpose, attempt, base) {
 	const iso = (d) => d.toISOString().slice(0, 10)
-	const base = new Date('2028-01-05T00:00:00Z').getTime() + (Date.now() % 280) * 86400000 + Math.floor(Math.random() * 30) * 86400000 + attempt * 86400000 * 45
 	const res = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/business-trips', {
 		data: {
 			startsAtUtc: `${iso(new Date(base))}T07:00:00Z`,
@@ -50,7 +118,7 @@ async function createTripOnce(page, purpose, attempt) {
 
 async function createTrip(page, purpose) {
 	for (let attempt = 0; attempt < 8; attempt++) {
-		const tripId = await createTripOnce(page, purpose, attempt)
+		const tripId = await createTripOnce(page, purpose, attempt, tripWindowBaseMs(attempt))
 		if (tripId !== null) {
 			return tripId
 		}
@@ -72,9 +140,14 @@ async function submitTrip(page, tripId) {
  * window between our create and submit. An orphan draft from a lost
  * submit race is cancelled before the next attempt — drafts count
  * toward the overlap check. */
-async function createAndSubmitTrip(page, purpose) {
+async function createAndSubmitTrip(page, adminPage, purpose) {
+	const employeeUid = credsFromEnv('EMPLOYEE').username
 	for (let attempt = 0; attempt < 8; attempt++) {
-		const tripId = await createTripOnce(page, purpose, attempt)
+		const base = tripWindowBaseMs(attempt)
+		if (!(await ensureUserRuleCoverage(adminPage, employeeUid, base))) {
+			continue
+		}
+		const tripId = await createTripOnce(page, purpose, attempt, base)
 		if (tripId === null) {
 			continue
 		}
@@ -104,13 +177,17 @@ test.describe('Manager business-trip decisions — CAS + scope (Docker dev)', ()
 	test('concurrent approves with the same CAS pair apply at most once', async ({ browser }) => {
 		skipIfMissingCreds('EMPLOYEE')
 		skipIfMissingCreds('MANAGER')
+		skipIfMissingCreds('ADMIN')
 		const purpose = `E2E CAS approve ${Date.now()}`
+
+		const adminPage = await browser.newPage()
+		await login(adminPage, credsFromEnv('ADMIN'))
 
 		const employeePage = await browser.newPage()
 		await login(employeePage, credsFromEnv('EMPLOYEE'))
 		await employeePage.goto(PAGE)
 		await assertArbeitszeitcheckLoaded(employeePage)
-		const tripId = await createAndSubmitTrip(employeePage, purpose)
+		const tripId = await createAndSubmitTrip(employeePage, adminPage, purpose)
 
 		const managerPage = await browser.newPage()
 		await login(managerPage, credsFromEnv('MANAGER'))
@@ -138,17 +215,22 @@ test.describe('Manager business-trip decisions — CAS + scope (Docker dev)', ()
 		const again = await apiAllowFailure(managerPage, 'POST', `${MGR_API}/${tripId}/approve`, { data: casPair })
 		expect(again.ok).toBe(false)
 
+		await adminPage.close()
 		await employeePage.close()
 		await managerPage.close()
 	})
 
 	test('non-manager employee cannot read the manager queue or manager detail', async ({ page }) => {
 		skipIfMissingCreds('EMPLOYEE')
+		skipIfMissingCreds('ADMIN')
 		await login(page, credsFromEnv('EMPLOYEE'))
 		await page.goto(PAGE)
+		const adminPage = await page.context().browser().newPage()
+		await login(adminPage, credsFromEnv('ADMIN'))
 		// The page itself redirects non-managers away; the API is the oracle.
 		const purpose = `E2E IDOR ${Date.now()}`
-		const tripId = await createAndSubmitTrip(page, purpose)
+		const tripId = await createAndSubmitTrip(page, adminPage, purpose)
+		await adminPage.close()
 
 		const queue = await apiAllowFailure(page, 'GET', MGR_API)
 		expect([403, 404]).toContain(queue.status)

@@ -911,9 +911,12 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 				await expect(pbPanel.locator('#wtm-model-breaks-count-as-work')).toBeChecked();
 				const pbCap = pbPanel.locator('#wtm-model-paid-break-cap');
 				await expect(pbCap).toHaveValue('45');
+				// Server-bound API waits use 60s: the shared dev DB can stall an admin
+				// report query ~20s under suite load, and a tighter bound flakes the
+				// leg without probing a product defect.
 				const impactResp = page.waitForResponse(
 					(r) => r.url().includes('/paid-break-impact') && r.status() === 200,
-					{ timeout: 15_000 });
+					{ timeout: 60_000 });
 				await pbCap.fill('30');
 				await impactResp;
 				await expect(pbPanel.locator('#wtm-model-paid-break-impact'))
@@ -980,7 +983,7 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 		const altYear = String(parseInt(curYear, 10) + 1);
 		const holResp = page.waitForResponse(
 			(r) => r.url().includes('/api/admin/state-holidays')
-				&& r.url().includes(`year=${altYear}`), { timeout: 20_000 });
+				&& r.url().includes(`year=${altYear}`), { timeout: 60_000 });
 		await yearSel.selectOption(altYear);
 		await holResp;
 		await expect(page.locator('#holiday-tbody tr').first())
@@ -994,7 +997,7 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 					(opts.find((o) => o.value !== cur) || {}).value || cur, curState);
 			const stResp = page.waitForResponse(
 				(r) => r.url().includes('/api/admin/state-holidays')
-					&& r.url().includes(`state=${encodeURIComponent(otherState)}`), { timeout: 20_000 });
+					&& r.url().includes(`state=${encodeURIComponent(otherState)}`), { timeout: 60_000 });
 			await stateSel.selectOption(otherState);
 			await stResp;
 		}
@@ -1006,7 +1009,7 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 		await page.locator('#severity-filter').selectOption('error');
 		const vResp = page.waitForResponse(
 			(r) => r.url().includes('/api/compliance/violations')
-				&& r.url().includes('severity=error'), { timeout: 20_000 });
+				&& r.url().includes('severity=error'), { timeout: 60_000 });
 		await page.locator('#apply-filters').click();
 		await vResp;
 		// Rendered severity badges (if any rows) must all match the filter value.
@@ -1025,7 +1028,7 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 		const altMonth = curMonth === 1 ? 2 : 1;
 		const otResp = page.waitForResponse(
 			(r) => r.url().includes('/api/admin/overtime-payouts')
-				&& r.url().includes(`month=${altMonth}`), { timeout: 20_000 });
+				&& r.url().includes(`month=${altMonth}`), { timeout: 60_000 });
 		await monthEl.selectOption(String(altMonth));
 		await page.locator('#ot-payout-refresh').click();
 		await otResp;
@@ -1037,7 +1040,7 @@ test.describe('Atlas web craft — ArbeitszeitCheck', () => {
 		await page.locator('#ot-audit-month').selectOption('1');
 		const auResp = page.waitForResponse(
 			(r) => r.url().includes('/api/admin/overtime-payout-audit')
-				&& r.url().includes('month=1'), { timeout: 20_000 });
+				&& r.url().includes('month=1'), { timeout: 60_000 });
 		await page.locator('#ot-audit-apply').click();
 		await auResp;
 

@@ -282,11 +282,15 @@ test.describe('Admin calendar subscription UI', () => {
 	})
 
 	test('responsive layout stays usable across core breakpoints', async ({ page }) => {
-		// Six full page reloads (one per breakpoint) take ~35-40s on a quiet
-		// instance; shared-instance contention pushed a run past the 60s cap.
+		// One page load, then six resizes: every assertion below is client-side
+		// CSS (grid columns, flex direction, boxes), which media queries apply
+		// live on setViewportSize. Reloading per breakpoint cost six full NC
+		// page loads and timed out under shared-instance contention.
 		test.setTimeout(120_000)
 		await login(page, credsFromEnv('ADMIN'))
 		await wireOutlookMocks(page)
+		await page.goto('/apps/arbeitszeitcheck/admin/settings/outlook-subscription')
+		await assertArbeitszeitcheckLoaded(page)
 
 		const viewports = [
 			{ width: 320, height: 900, columns: '1', buttonDirection: 'column' },
@@ -302,8 +306,6 @@ test.describe('Admin calendar subscription UI', () => {
 
 		for (const viewport of viewports) {
 			await page.setViewportSize({ width: viewport.width, height: viewport.height })
-			await page.goto('/apps/arbeitszeitcheck/admin/settings/outlook-subscription')
-			await assertArbeitszeitcheckLoaded(page)
 
 			await page.locator('#outlookIcalTeamSearch').fill('sup')
 			if (viewport.width < 1024) {

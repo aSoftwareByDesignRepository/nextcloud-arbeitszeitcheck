@@ -13,7 +13,7 @@ import AxeBuilder from '@axe-core/playwright'
 import { login, credsFromEnv, skipIfMissingCreds } from './helpers/auth.js'
 import { api, apiAllowFailure } from './helpers/api.js'
 import { assertArbeitszeitcheckLoaded } from './helpers/app-config.js'
-import { ensureUserRuleCoverage } from './helpers/business-trip-rules.js'
+import { ensureUserRuleCoverage, freeTripWindowBases } from './helpers/business-trip-rules.js'
 
 test.use({ trace: 'off' })
 
@@ -33,10 +33,13 @@ async function submitTrip(page, purpose) {
 	try {
 		await login(adminPage, credsFromEnv('ADMIN'))
 		const employeeUid = credsFromEnv('EMPLOYEE').username
-		for (let attempt = 0; attempt < 8; attempt++) {
-			const base = new Date('2028-03-01T00:00:00Z').getTime()
-				+ (Date.now() % 240) * 86400000
-				+ Math.floor(Math.random() * 60) * 86400000
+		const bases = await freeTripWindowBases(page)
+		if (bases.length === 0) {
+			throw new Error('no free trip window left in scan span')
+		}
+		const offset = Math.floor(Math.random() * bases.length)
+		for (let attempt = 0; attempt < Math.min(bases.length, 24); attempt++) {
+			const base = bases[(offset + attempt) % bases.length]
 			const coverage = await ensureUserRuleCoverage(adminPage, employeeUid, base - 86400000, base + 3 * 86400000, base + 2 * 86400000)
 			if (!coverage) {
 				continue
@@ -72,7 +75,7 @@ async function submitTrip(page, purpose) {
 			}
 			await withdrawTrip(page, tripId)
 		}
-		throw new Error('could not place a non-overlapping trip after 8 attempts')
+		throw new Error(`could not place a non-overlapping trip after ${Math.min(bases.length, 24)} attempts`)
 	} finally {
 		await adminPage.close()
 	}

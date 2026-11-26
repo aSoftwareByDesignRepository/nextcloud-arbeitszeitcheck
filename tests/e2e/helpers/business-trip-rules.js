@@ -74,3 +74,47 @@ export async function ensureUserRuleCoverage(adminPage, employeeUid, fromMs, toM
 	})
 	return res.ok
 }
+
+/** Statuses the overlap validator counts (BusinessTripMapper::findOverlapping). */
+const TRIP_BLOCKING_STATUSES = new Set(['draft', 'submitted', 'approved'])
+
+/** Deterministic non-overlapping trip-window picker for the shared dev
+ *  employee. Past runs leave draft/submitted/approved trips behind and
+ *  random candidate dates saturate as the calendar fills (20261126: 71%
+ *  of the 2028 window blocked → the old 8-random-attempts loop failed).
+ *  Reads the employee's own trip index once, marks the blocking
+ *  intervals, and returns every free base day inside a far-future span;
+ *  callers iterate from a random start offset so sibling specs still
+ *  spread across days.
+ *
+ *  @param {import('@playwright/test').Page} page employee session
+ *  @param {{anchor?: string, spanDays?: number, tripDays?: number}} [opts]
+ *          anchor: ISO date of the first candidate base day;
+ *          tripDays: day offset between trip start (base 07:00Z) and end
+ *          (base+tripDays 16:00Z) — matches the caller's create payload.
+ *  @returns {Promise<number[]>} free base-day timestamps (UTC ms), ascending */
+export async function freeTripWindowBases(page, { anchor = '2028-03-01T00:00:00Z', spanDays = 730, tripDays = 2 } = {}) {
+	const blocking = []
+	for (let offset = 0; offset < 2000; offset += 200) {
+		const res = await api(page, 'GET', `/apps/arbeitszeitcheck/api/business-trips?limit=200&offset=${offset}`)
+		for (const t of res.items ?? []) {
+			if (TRIP_BLOCKING_STATUSES.has(t.status)) {
+				blocking.push([Date.parse(t.startsAtUtc), Date.parse(t.endsAtUtc)])
+			}
+		}
+		if ((res.items ?? []).length < 200) {
+			break
+		}
+	}
+	const anchorMs = new Date(anchor).getTime()
+	const bases = []
+	for (let d = 0; d <= spanDays; d++) {
+		const base = anchorMs + d * 86400000
+		const start = base + 7 * 3600000
+		const end = base + tripDays * 86400000 + 16 * 3600000
+		if (!blocking.some(([s, e]) => start <= e && end >= s)) {
+			bases.push(base)
+		}
+	}
+	return bases
+}

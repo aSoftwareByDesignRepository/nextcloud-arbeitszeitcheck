@@ -16,17 +16,18 @@ import { test, expect } from '@playwright/test'
 import { login, credsFromEnv, skipIfMissingCreds } from './helpers/auth.js'
 import { api, apiAllowFailure } from './helpers/api.js'
 import { assertArbeitszeitcheckLoaded } from './helpers/app-config.js'
-import { ensureUserRuleCoverage } from './helpers/business-trip-rules.js'
+import { ensureUserRuleCoverage, freeTripWindowBases } from './helpers/business-trip-rules.js'
 
 test.use({ trace: 'off' })
 
 const MGR_API = '/apps/arbeitszeitcheck/api/manager/business-trips'
 const PAGE = '/apps/arbeitszeitcheck/manager/business-trips'
 
-/** Unique far-future window per attempt — trips persist in the dev DB, so
- * fixed dates collide with prior runs (overlap validator). */
-function tripWindowBaseMs(attempt) {
-	return new Date('2028-01-05T00:00:00Z').getTime() + (Date.now() % 280) * 86400000 + Math.floor(Math.random() * 30) * 86400000 + attempt * 86400000 * 45
+/** Deterministic free base days — trips persist in the dev DB, so fixed
+ * dates collide with prior runs (overlap validator). These trips run
+ * 07:00Z → next-day 16:00Z (tripDays: 1). */
+function tripBases(page) {
+	return freeTripWindowBases(page, { anchor: '2028-01-05T00:00:00Z', tripDays: 1 })
 }
 
 /** One attempt; returns the trip id, or null when the window is already
@@ -54,13 +55,18 @@ async function createTripOnce(page, purpose, attempt, base) {
 }
 
 async function createTrip(page, purpose) {
-	for (let attempt = 0; attempt < 8; attempt++) {
-		const tripId = await createTripOnce(page, purpose, attempt, tripWindowBaseMs(attempt))
+	const bases = await tripBases(page)
+	if (bases.length === 0) {
+		throw new Error('no free trip window left in scan span')
+	}
+	const offset = Math.floor(Math.random() * bases.length)
+	for (let attempt = 0; attempt < Math.min(bases.length, 24); attempt++) {
+		const tripId = await createTripOnce(page, purpose, attempt, bases[(offset + attempt) % bases.length])
 		if (tripId !== null) {
 			return tripId
 		}
 	}
-	throw new Error('could not place a non-overlapping trip after 8 attempts')
+	throw new Error(`could not place a non-overlapping trip after ${Math.min(bases.length, 24)} attempts`)
 }
 
 async function submitTrip(page, tripId) {
@@ -79,8 +85,13 @@ async function submitTrip(page, tripId) {
  * toward the overlap check. */
 async function createAndSubmitTrip(page, adminPage, purpose) {
 	const employeeUid = credsFromEnv('EMPLOYEE').username
-	for (let attempt = 0; attempt < 8; attempt++) {
-		const base = tripWindowBaseMs(attempt)
+	const bases = await tripBases(page)
+	if (bases.length === 0) {
+		throw new Error('no free trip window left in scan span')
+	}
+	const offset = Math.floor(Math.random() * bases.length)
+	for (let attempt = 0; attempt < Math.min(bases.length, 24); attempt++) {
+		const base = bases[(offset + attempt) % bases.length]
 		if (!(await ensureUserRuleCoverage(adminPage, employeeUid, base - 86400000, base + 2 * 86400000, base + 86400000))) {
 			continue
 		}
@@ -103,7 +114,7 @@ async function createAndSubmitTrip(page, adminPage, purpose) {
 			})
 		}
 	}
-	throw new Error('could not place a non-overlapping submitted trip after 8 attempts')
+	throw new Error(`could not place a non-overlapping submitted trip after ${Math.min(bases.length, 24)} attempts`)
 }
 
 async function managerDetail(page, tripId) {

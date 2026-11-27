@@ -57,6 +57,9 @@ final class TimeEntryClockPayloadBuilder
 			'endTime' => $endDateTime->format('c'),
 		];
 
+		if (isset($params['breaks']) && !is_array($params['breaks'])) {
+			throw new \InvalidArgumentException('breaks must be an array of {start, end} objects.');
+		}
 		$breaks = isset($params['breaks']) && is_array($params['breaks']) ? $params['breaks'] : null;
 		if ($breaks !== null) {
 			if ($breaks === []) {
@@ -126,6 +129,9 @@ final class TimeEntryClockPayloadBuilder
 			return null;
 		}
 
+		if (isset($params['breaks']) && !is_array($params['breaks'])) {
+			throw new \InvalidArgumentException('breaks must be an array of {start, end} objects.');
+		}
 		$breaks = isset($params['breaks']) && is_array($params['breaks']) ? $params['breaks'] : null;
 		if ($breaks !== null) {
 			if ($breaks === []) {
@@ -161,6 +167,9 @@ final class TimeEntryClockPayloadBuilder
 		}
 		if (isset($params['endTime']) && is_string($params['endTime']) && !self::isPlainTime(trim($params['endTime']))) {
 			$proposal['endTime'] = $params['endTime'];
+		}
+		if (isset($params['breaks']) && !is_array($params['breaks'])) {
+			throw new \InvalidArgumentException('breaks must be an array of {start, end} objects.');
 		}
 		if (isset($params['breaks']) && is_array($params['breaks'])) {
 			$proposal['breaks'] = $params['breaks'];
@@ -247,19 +256,19 @@ final class TimeEntryClockPayloadBuilder
 	{
 		$minSeconds = BreakCountable::minSeconds($minBreakMinutes);
 		$validBreaks = [];
-		foreach ($breaks as $break) {
+		foreach ($breaks as $index => $break) {
 			if (!is_array($break)) {
-				continue;
+				throw new \InvalidArgumentException('Each break must be an object with start and end times.');
 			}
 			$startKey = isset($break['start']) ? 'start' : (isset($break['start_time']) ? 'start_time' : null);
 			$endKey = isset($break['end']) ? 'end' : (isset($break['end_time']) ? 'end_time' : null);
 			if ($startKey === null || $endKey === null) {
-				continue;
+				throw new \InvalidArgumentException(sprintf('Break #%d must have both start and end times.', $index + 1));
 			}
 			$rawStart = trim((string)$break[$startKey]);
 			$rawEnd = trim((string)$break[$endKey]);
 			if ($rawStart === '' || $rawEnd === '' || !self::isPlainTime($rawStart) || !self::isPlainTime($rawEnd)) {
-				continue;
+				throw new \InvalidArgumentException(sprintf('Break #%d has an invalid time format.', $index + 1));
 			}
 			$breakStart = clone $baseDate;
 			[$bh, $bm] = explode(':', $rawStart, 2);

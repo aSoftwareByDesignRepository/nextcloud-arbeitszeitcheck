@@ -120,6 +120,106 @@ class TimeEntryTest extends TestCase
 		$this->assertStringContainsString('Break #2', $errors['breaks']);
 	}
 
+	private function baseEntry(): TimeEntry
+	{
+		$entry = new TimeEntry();
+		$entry->setUserId('de-user');
+		$entry->setStatus(TimeEntry::STATUS_COMPLETED);
+		$entry->setStartTime(new \DateTime('2024-01-01 08:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-01 12:00:00'));
+		$entry->setCountableMinBreakMinutes(15);
+		return $entry;
+	}
+
+	public function testValidateRejectsBreakEndingAfterWorkEnd(): void
+	{
+		// MOMOS repro (entry 13174): a break in the clamped-away tail was
+		// stored and deducted even though the shift ended earlier.
+		$entry = $this->baseEntry();
+		$entry->setBreaks(json_encode([
+			['start' => '2024-01-01T15:00:00+00:00', 'end' => '2024-01-01T16:00:00+00:00'],
+		]));
+		$errors = $entry->validate(15);
+		$this->assertArrayHasKey('breaks', $errors);
+	}
+
+	public function testValidateRejectsBreakStartingBeforeWorkStart(): void
+	{
+		$entry = $this->baseEntry();
+		$entry->setBreaks(json_encode([
+			['start' => '2024-01-01T06:00:00+00:00', 'end' => '2024-01-01T09:00:00+00:00'],
+		]));
+		$errors = $entry->validate(15);
+		$this->assertArrayHasKey('breaks', $errors);
+	}
+
+	public function testValidateRejectsBreakStraddlingWorkEnd(): void
+	{
+		$entry = $this->baseEntry();
+		$entry->setBreaks(json_encode([
+			['start' => '2024-01-01T11:30:00+00:00', 'end' => '2024-01-01T12:30:00+00:00'],
+		]));
+		$errors = $entry->validate(15);
+		$this->assertArrayHasKey('breaks', $errors);
+	}
+
+	public function testValidateRejectsReversedBreakDirection(): void
+	{
+		// MOMOS repro (entry 13236): a reversed break munged to +1 day became a
+		// 23-hour deduction that zeroed the worked hours.
+		$entry = $this->baseEntry();
+		$entry->setBreaks(json_encode([
+			['start' => '2024-01-01T10:00:00+00:00', 'end' => '2024-01-01T09:00:00+00:00'],
+		]));
+		$errors = $entry->validate(15);
+		$this->assertArrayHasKey('breaks', $errors);
+	}
+
+	public function testValidateRejectsOvernightBreakOutsideWindow(): void
+	{
+		// The controller munges reversed clock times to next-day; a 23h break
+		// lands outside the work window and must be rejected there too.
+		$entry = $this->baseEntry();
+		$entry->setBreaks(json_encode([
+			['start' => '2024-01-01T09:00:00+00:00', 'end' => '2024-01-02T08:00:00+00:00'],
+		]));
+		$errors = $entry->validate(15);
+		$this->assertArrayHasKey('breaks', $errors);
+	}
+
+	public function testValidateRejectsBreakElementsMissingKeys(): void
+	{
+		$entry = $this->baseEntry();
+		$entry->setBreaks(json_encode([
+			['start' => '2024-01-01T09:00:00+00:00'],
+		]));
+		$errors = $entry->validate(15);
+		$this->assertArrayHasKey('breaks', $errors);
+	}
+
+	public function testValidateRejectsNonObjectBreakElements(): void
+	{
+		$entry = $this->baseEntry();
+		$entry->setBreaks(json_encode([null, 'garbage']));
+		$errors = $entry->validate(15);
+		$this->assertArrayHasKey('breaks', $errors);
+	}
+
+	public function testValidateAcceptsOvernightShiftBreakInsideWindow(): void
+	{
+		// Legit night shift 22:00→06:00(+1d): a break inside the window must
+		// keep passing — the in-window check is against the entry span, not
+		// the calendar day.
+		$entry = $this->baseEntry();
+		$entry->setStartTime(new \DateTime('2024-01-01 22:00:00'));
+		$entry->setEndTime(new \DateTime('2024-01-02 06:00:00'));
+		$entry->setBreaks(json_encode([
+			['start' => '2024-01-02T01:00:00+00:00', 'end' => '2024-01-02T01:30:00+00:00'],
+		]));
+		$errors = $entry->validate(15);
+		$this->assertArrayNotHasKey('breaks', $errors);
+	}
+
 	public function testCanDeleteManualCompletedEntry(): void
 	{
 		$entry = new TimeEntry();

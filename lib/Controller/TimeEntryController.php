@@ -706,6 +706,79 @@ class TimeEntryController extends Controller
 	}
 
 	/**
+	 * Normalize a decoded `breaks` payload into stored-shape portions.
+	 * Every element must be an object carrying start/end (or the
+	 * start_time/end_time aliases) with parseable times — malformed input is
+	 * a caller error and must never be silently skipped (MOMOS: payloads
+	 * like `breaks:"notanarray"`, `[null,null]`, `[{"start":"garbage"}]` or a
+	 * missing `end` were accepted with 201 and silently dropped).
+	 *
+	 * @param array<int,mixed> $breaks decoded breaks payload elements
+	 * @return array{breaks: array<int, array{start:string,end:string}>, error: ?string}
+	 */
+	private function normalizeBreaksForEntry(array $breaks, ?\DateTime $baseDate, int $minBreakDurationSeconds): array
+	{
+		$isPlainTime = static function (string $value): bool {
+			return (bool)\preg_match('/^([01]?\d|2[0-3]):([0-5]\d)$/', $value);
+		};
+		$validBreaks = [];
+		foreach ($breaks as $index => $break) {
+			if (!is_array($break)) {
+				return ['breaks' => [], 'error' => sprintf('Break #%d must be an object with start and end times', $index + 1)];
+			}
+			// Support both {start,end} and {start_time,end_time} from clients
+			$startKey = isset($break['start']) ? 'start' : (isset($break['start_time']) ? 'start_time' : null);
+			$endKey = isset($break['end']) ? 'end' : (isset($break['end_time']) ? 'end_time' : null);
+			if ($startKey === null || $endKey === null) {
+				return ['breaks' => [], 'error' => sprintf('Break #%d must provide start and end times', $index + 1)];
+			}
+			if (!is_scalar($break[$startKey]) || !is_scalar($break[$endKey])) {
+				return ['breaks' => [], 'error' => sprintf('Break #%d has an invalid time format', $index + 1)];
+			}
+
+			try {
+				$rawStart = (string)$break[$startKey];
+				$rawEnd = (string)$break[$endKey];
+
+				// Combine date + time if only local times were provided
+				if ($baseDate instanceof \DateTime && $isPlainTime($rawStart)) {
+					$breakStart = clone $baseDate;
+					[$h, $m] = \explode(':', $rawStart, 2);
+					$breakStart->setTime((int)$h, (int)$m, 0);
+				} else {
+					$breakStart = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($rawStart, $this->getAppTimeZone());
+				}
+
+				if ($baseDate instanceof \DateTime && $isPlainTime($rawEnd)) {
+					$breakEnd = clone $baseDate;
+					[$h, $m] = \explode(':', $rawEnd, 2);
+					$breakEnd->setTime((int)$h, (int)$m, 0);
+				} else {
+					$breakEnd = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($rawEnd, $this->getAppTimeZone());
+				}
+
+				// Handle overnight breaks
+				if ($breakEnd < $breakStart) {
+					$breakEnd->modify('+1 day');
+				}
+
+				$breakDurationSeconds = $breakEnd->getTimestamp() - $breakStart->getTimestamp();
+
+				// Only include breaks that meet the profile countable floor
+				if ($breakDurationSeconds >= $minBreakDurationSeconds) {
+					$validBreaks[] = [
+						'start' => $breakStart->format('c'),
+						'end' => $breakEnd->format('c')
+					];
+				}
+			} catch (\Exception $e) {
+				return ['breaks' => [], 'error' => sprintf('Break #%d has an invalid time format', $index + 1)];
+			}
+		}
+		return ['breaks' => $validBreaks, 'error' => null];
+	}
+
+	/**
 	 * Get time entries endpoint
 	 *
 	 * Retrieves time entries for the current user with optional filtering by date range and status.
@@ -1786,61 +1859,27 @@ class TimeEntryController extends Controller
 
 				// Handle breaks: prefer breaks JSON (multiple breaks) over single break fields
 				$breaks = $this->decodeBreaksPayload($breaksJson);
+				if ($breaks === null && $breaksJson !== null && $breaksJson !== '') {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('breaks must be an array of {start, end} objects.')
+					], Http::STATUS_BAD_REQUEST);
+				}
 				if ($breaks !== null) {
 					if (!empty($breaks)) {
 						// Filter out breaks shorter than the profile floor (DE/CH 15, AT 10)
-						$validBreaks = [];
-						$minBreakDurationSeconds = BreakCountable::minSeconds(
-							$this->countableMinBreakMinutes($entry->getUserId())
+						$normalized = $this->normalizeBreaksForEntry(
+							$breaks,
+							$baseDate,
+							BreakCountable::minSeconds($this->countableMinBreakMinutes($entry->getUserId()))
 						);
-						foreach ($breaks as $break) {
-							// Support both {start,end} and {start_time,end_time}
-							$startKey = isset($break['start']) ? 'start' : (isset($break['start_time']) ? 'start_time' : null);
-							$endKey = isset($break['end']) ? 'end' : (isset($break['end_time']) ? 'end_time' : null);
-							if ($startKey === null || $endKey === null) {
-								continue;
-							}
-
-							try {
-								$rawStart = (string)$break[$startKey];
-								$rawEnd = (string)$break[$endKey];
-
-								// Combine date + time if only local times were provided
-								if ($baseDate instanceof \DateTime && $isPlainTime($rawStart)) {
-									$breakStart = clone $baseDate;
-									[$h, $m] = \explode(':', $rawStart, 2);
-									$breakStart->setTime((int)$h, (int)$m, 0);
-								} else {
-									$breakStart = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($rawStart, $this->getAppTimeZone());
-								}
-
-								if ($baseDate instanceof \DateTime && $isPlainTime($rawEnd)) {
-									$breakEnd = clone $baseDate;
-									[$h, $m] = \explode(':', $rawEnd, 2);
-									$breakEnd->setTime((int)$h, (int)$m, 0);
-								} else {
-									$breakEnd = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($rawEnd, $this->getAppTimeZone());
-								}
-
-								// Handle overnight breaks
-								if ($breakEnd < $breakStart) {
-									$breakEnd->modify('+1 day');
-								}
-
-								$breakDurationSeconds = $breakEnd->getTimestamp() - $breakStart->getTimestamp();
-
-								// Only include breaks that meet the profile countable floor
-								if ($breakDurationSeconds >= $minBreakDurationSeconds) {
-									$validBreaks[] = [
-										'start' => $breakStart->format('c'),
-										'end' => $breakEnd->format('c')
-									];
-								}
-							} catch (\Exception $e) {
-								// Skip invalid break times
-								continue;
-							}
+						if ($normalized['error'] !== null) {
+							return new JSONResponse([
+								'success' => false,
+								'error' => $this->l10n->t($normalized['error'])
+							], Http::STATUS_BAD_REQUEST);
 						}
+						$validBreaks = $normalized['breaks'];
 
 						if (!empty($validBreaks)) {
 							$entry->setBreaks(json_encode($validBreaks));
@@ -1933,6 +1972,40 @@ class TimeEntryController extends Controller
 						$endTime = clone $startTime;
 						$endTime->modify('+' . round($hours * 3600) . ' seconds');
 						$entry->setEndTime($endTime);
+					}
+				}
+
+				// `breaks` submitted without start/end — apply them against the
+				// entry's existing window. Previously the field was silently
+				// ignored on this path (MOMOS LOW): a client believes its break
+				// was recorded while nothing changed.
+				if ($breaksJson !== null && $breaksJson !== '') {
+					$breaksOnly = $this->decodeBreaksPayload($breaksJson);
+					if ($breaksOnly === null) {
+						return new JSONResponse([
+							'success' => false,
+							'error' => $this->l10n->t('breaks must be an array of {start, end} objects.')
+						], Http::STATUS_BAD_REQUEST);
+					}
+					if (!empty($breaksOnly)) {
+						$normalizedOnly = $this->normalizeBreaksForEntry(
+							$breaksOnly,
+							$entry->getStartTime(),
+							BreakCountable::minSeconds($this->countableMinBreakMinutes($entry->getUserId()))
+						);
+						if ($normalizedOnly['error'] !== null) {
+							return new JSONResponse([
+								'success' => false,
+								'error' => $this->l10n->t($normalizedOnly['error'])
+							], Http::STATUS_BAD_REQUEST);
+						}
+						$entry->setBreaks(empty($normalizedOnly['breaks']) ? null : json_encode($normalizedOnly['breaks']));
+						$entry->setBreakStartTime(null);
+						$entry->setBreakEndTime(null);
+					} else {
+						$entry->setBreaks(null);
+						$entry->setBreakStartTime(null);
+						$entry->setBreakEndTime(null);
 					}
 				}
 
@@ -2735,12 +2808,19 @@ class TimeEntryController extends Controller
 			if (!isset($params['date']) || !is_string($params['date']) || trim($params['date']) === '') {
 				$params['date'] = $entry->getStartTime() ? $entry->getStartTime()->format('Y-m-d') : null;
 			}
-			$clock = \OCA\ArbeitszeitCheck\Support\TimeEntryClockPayloadBuilder::buildPartialFromParams(
-				$params,
-				$this->countableMinBreakMinutes($entry->getUserId()),
-				$entry->getStartTime(),
-				$this->getAppTimeZone(),
-			);
+			try {
+				$clock = \OCA\ArbeitszeitCheck\Support\TimeEntryClockPayloadBuilder::buildPartialFromParams(
+					$params,
+					$this->countableMinBreakMinutes($entry->getUserId()),
+					$entry->getStartTime(),
+					$this->getAppTimeZone(),
+				);
+			} catch (\Exception $e) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t($e->getMessage()),
+				], Http::STATUS_BAD_REQUEST);
+			}
 			$endIso = null;
 			if ($clock !== null && isset($clock['endTime'])) {
 				$endIso = (string)$clock['endTime'];
@@ -3237,20 +3317,27 @@ class TimeEntryController extends Controller
 					return (bool)\preg_match('/^([01]?\d|2[0-3]):([0-5]\d)$/', $value);
 				};
 
-				if ($baseDate instanceof \DateTime && $isPlainTime($startTime)) {
-					$startDateTime = clone $baseDate;
-					[$h, $m] = \explode(':', $startTime, 2);
-					$startDateTime->setTime((int)$h, (int)$m, 0);
-				} else {
-					$startDateTime = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($startTime, $this->getAppTimeZone());
-				}
+				try {
+					if ($baseDate instanceof \DateTime && $isPlainTime($startTime)) {
+						$startDateTime = clone $baseDate;
+						[$h, $m] = \explode(':', $startTime, 2);
+						$startDateTime->setTime((int)$h, (int)$m, 0);
+					} else {
+						$startDateTime = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($startTime, $this->getAppTimeZone());
+					}
 
-				if ($baseDate instanceof \DateTime && $isPlainTime($endTime)) {
-					$endDateTime = clone $baseDate;
-					[$h, $m] = \explode(':', $endTime, 2);
-					$endDateTime->setTime((int)$h, (int)$m, 0);
-				} else {
-					$endDateTime = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($endTime, $this->getAppTimeZone());
+					if ($baseDate instanceof \DateTime && $isPlainTime($endTime)) {
+						$endDateTime = clone $baseDate;
+						[$h, $m] = \explode(':', $endTime, 2);
+						$endDateTime->setTime((int)$h, (int)$m, 0);
+					} else {
+						$endDateTime = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($endTime, $this->getAppTimeZone());
+					}
+				} catch (\Throwable $e) {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('Invalid start or end time format. Use HH:mm or ISO 8601.')
+					], Http::STATUS_BAD_REQUEST);
 				}
 
 				// Overnight work: if we have a base date and end < start, treat end as next day
@@ -3266,61 +3353,27 @@ class TimeEntryController extends Controller
 				// Handle breaks: prefer breaks JSON (multiple breaks) over single break fields
 				$breaksJson = $params['breaks'] ?? null;
 				$breaks = $this->decodeBreaksPayload($breaksJson);
+				if ($breaks === null && $breaksJson !== null && $breaksJson !== '') {
+					return new JSONResponse([
+						'success' => false,
+						'error' => $this->l10n->t('breaks must be an array of {start, end} objects.')
+					], Http::STATUS_BAD_REQUEST);
+				}
 				if ($breaks !== null) {
 					if (!empty($breaks)) {
 						// Filter out breaks shorter than the profile floor (DE/CH 15, AT 10)
-						$validBreaks = [];
-						$minBreakDurationSeconds = BreakCountable::minSeconds(
-							$this->countableMinBreakMinutes($userId)
+						$normalized = $this->normalizeBreaksForEntry(
+							$breaks,
+							$baseDate,
+							BreakCountable::minSeconds($this->countableMinBreakMinutes($userId))
 						);
-						foreach ($breaks as $break) {
-							// Support both {start,end} and {start_time,end_time} from clients
-							$startKey = isset($break['start']) ? 'start' : (isset($break['start_time']) ? 'start_time' : null);
-							$endKey = isset($break['end']) ? 'end' : (isset($break['end_time']) ? 'end_time' : null);
-							if ($startKey === null || $endKey === null) {
-								continue;
-							}
-
-							try {
-								$rawStart = (string)$break[$startKey];
-								$rawEnd = (string)$break[$endKey];
-
-								// Combine date + time if only local times were provided
-								if ($baseDate instanceof \DateTime && $isPlainTime($rawStart)) {
-									$breakStart = clone $baseDate;
-									[$h, $m] = \explode(':', $rawStart, 2);
-									$breakStart->setTime((int)$h, (int)$m, 0);
-								} else {
-									$breakStart = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($rawStart, $this->getAppTimeZone());
-								}
-
-								if ($baseDate instanceof \DateTime && $isPlainTime($rawEnd)) {
-									$breakEnd = clone $baseDate;
-									[$h, $m] = \explode(':', $rawEnd, 2);
-									$breakEnd->setTime((int)$h, (int)$m, 0);
-								} else {
-									$breakEnd = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($rawEnd, $this->getAppTimeZone());
-								}
-
-								// Handle overnight breaks
-								if ($breakEnd < $breakStart) {
-									$breakEnd->modify('+1 day');
-								}
-
-								$breakDurationSeconds = $breakEnd->getTimestamp() - $breakStart->getTimestamp();
-
-								// Only include breaks that meet the profile countable floor
-								if ($breakDurationSeconds >= $minBreakDurationSeconds) {
-									$validBreaks[] = [
-										'start' => $breakStart->format('c'),
-										'end' => $breakEnd->format('c'),
-									];
-								}
-							} catch (\Exception $e) {
-								// Skip invalid break times
-								continue;
-							}
+						if ($normalized['error'] !== null) {
+							return new JSONResponse([
+								'success' => false,
+								'error' => $this->l10n->t($normalized['error'])
+							], Http::STATUS_BAD_REQUEST);
 						}
+						$validBreaks = $normalized['breaks'];
 
 						if (!empty($validBreaks)) {
 							$timeEntry->setBreaks(json_encode($validBreaks));
@@ -3341,23 +3394,30 @@ class TimeEntryController extends Controller
 					}
 				} elseif ($breakStartTime && $breakEndTime) {
 					// Fallback to single break fields (backward compatibility)
-					$singleBreakStart = null;
-					$singleBreakEnd = null;
+					try {
+						$singleBreakStart = null;
+						$singleBreakEnd = null;
 
-					if ($baseDate instanceof \DateTime && $isPlainTime($breakStartTime)) {
-						$singleBreakStart = clone $baseDate;
-						[$h, $m] = \explode(':', $breakStartTime, 2);
-						$singleBreakStart->setTime((int)$h, (int)$m, 0);
-					} else {
-						$singleBreakStart = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($breakStartTime, $this->getAppTimeZone());
-					}
+						if ($baseDate instanceof \DateTime && $isPlainTime($breakStartTime)) {
+							$singleBreakStart = clone $baseDate;
+							[$h, $m] = \explode(':', $breakStartTime, 2);
+							$singleBreakStart->setTime((int)$h, (int)$m, 0);
+						} else {
+							$singleBreakStart = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($breakStartTime, $this->getAppTimeZone());
+						}
 
-					if ($baseDate instanceof \DateTime && $isPlainTime($breakEndTime)) {
-						$singleBreakEnd = clone $baseDate;
-						[$h, $m] = \explode(':', $breakEndTime, 2);
-						$singleBreakEnd->setTime((int)$h, (int)$m, 0);
-					} else {
-						$singleBreakEnd = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($breakEndTime, $this->getAppTimeZone());
+						if ($baseDate instanceof \DateTime && $isPlainTime($breakEndTime)) {
+							$singleBreakEnd = clone $baseDate;
+							[$h, $m] = \explode(':', $breakEndTime, 2);
+							$singleBreakEnd->setTime((int)$h, (int)$m, 0);
+						} else {
+							$singleBreakEnd = AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($breakEndTime, $this->getAppTimeZone());
+						}
+					} catch (\Throwable $e) {
+						return new JSONResponse([
+							'success' => false,
+							'error' => $this->l10n->t('Invalid break start or end time format.')
+						], Http::STATUS_BAD_REQUEST);
 					}
 
 					if ($singleBreakEnd < $singleBreakStart) {

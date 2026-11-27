@@ -17,6 +17,7 @@ use OCA\ArbeitszeitCheck\Db\MonthClosureMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
 use OCA\ArbeitszeitCheck\Exception\BusinessRuleException;
+use OCA\ArbeitszeitCheck\Support\CsvCellSanitizer;
 use OCA\ArbeitszeitCheck\Support\DatevPremiumLohnartMap;
 use OCP\IConfig;
 use OCP\IL10N;
@@ -468,6 +469,10 @@ class DatevExportService
 	 */
 	private static function datevField(string $value): string
 	{
-		return str_replace(['|', "\r", "\n", "\t"], ' ', $value);
+		$stripped = str_replace(['|', "\r", "\n", "\t"], ' ', $value);
+		// Same formula-injection guard as the CSV export — a DATEV file opened
+		// in Excel/LibreOffice evaluates a leading = + - @ otherwise (MOMOS:
+		// description `=cmd "/c calc"!A0` landed raw while the CSV escaped it).
+		return CsvCellSanitizer::sanitize($stripped);
 	}
 }

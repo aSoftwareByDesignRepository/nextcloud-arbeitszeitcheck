@@ -146,22 +146,54 @@ class TimeEntryClockPayloadBuilderTest extends TestCase
 		self::assertCount(3, $proposal['breaks']);
 	}
 
-	public function testMalformedBreakEntriesAreSkipped(): void
+	public function testMalformedBreakEntryThrows(): void
 	{
-		$proposal = TimeEntryClockPayloadBuilder::buildFromParams([
+		$this->expectException(\InvalidArgumentException::class);
+		TimeEntryClockPayloadBuilder::buildFromParams([
 			'date' => '15.06.2026',
 			'startTime' => '08:00',
 			'endTime' => '16:30',
 			'breaks' => [
 				'not-an-array',
-				['start' => '12:00'],
-				['start' => '99:00', 'end' => '12:30'],
-				['start' => '13:00', 'end' => '13:30'],
 			],
 		]);
-		self::assertNotNull($proposal);
-		self::assertArrayHasKey('breaks', $proposal);
-		self::assertCount(1, $proposal['breaks']);
+	}
+
+	public function testBreakEntryMissingEndThrows(): void
+	{
+		$this->expectException(\InvalidArgumentException::class);
+		TimeEntryClockPayloadBuilder::buildFromParams([
+			'date' => '15.06.2026',
+			'startTime' => '08:00',
+			'endTime' => '16:30',
+			'breaks' => [
+				['start' => '12:00'],
+			],
+		]);
+	}
+
+	public function testBreakEntryWithInvalidTimeThrows(): void
+	{
+		$this->expectException(\InvalidArgumentException::class);
+		TimeEntryClockPayloadBuilder::buildFromParams([
+			'date' => '15.06.2026',
+			'startTime' => '08:00',
+			'endTime' => '16:30',
+			'breaks' => [
+				['start' => '99:00', 'end' => '12:30'],
+			],
+		]);
+	}
+
+	public function testNonArrayBreaksParamThrows(): void
+	{
+		$this->expectException(\InvalidArgumentException::class);
+		TimeEntryClockPayloadBuilder::buildFromParams([
+			'date' => '15.06.2026',
+			'startTime' => '08:00',
+			'endTime' => '16:30',
+			'breaks' => 'notanarray',
+		]);
 	}
 
 	public function testMergeIntoProposalUsesClockFieldsWhenAvailable(): void

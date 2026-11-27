@@ -1968,6 +1968,60 @@ class TimeTrackingService
 	}
 
 	/**
+	 * Remove automatic break portions that fall outside the entry's own
+	 * [startTime, endTime] window — e.g. after the daily-maximum clamp moved
+	 * the end time earlier. Manual portions are never touched (they are
+	 * user reality; validate() rejects them honestly). Malformed portions
+	 * are kept for validate() to flag.
+	 *
+	 * @return int number of automatic portions dropped
+	 */
+	private function dropAutomaticBreaksOutsideWindow(TimeEntry $entry): int
+	{
+		$json = $entry->getBreaks();
+		$start = $entry->getStartTime();
+		$end = $entry->getEndTime();
+		if (!is_string($json) || $json === '' || !$start || !$end) {
+			return 0;
+		}
+		$breaks = json_decode($json, true);
+		if (!is_array($breaks) || $breaks === []) {
+			return 0;
+		}
+
+		$kept = [];
+		$dropped = 0;
+		foreach ($breaks as $portion) {
+			$isAutomatic = is_array($portion) && ($portion['automatic'] ?? false) === true;
+			$insideWindow = false;
+			if (is_array($portion) && isset($portion['start'], $portion['end'])) {
+				try {
+					$bs = new \DateTime((string)$portion['start']);
+					$be = new \DateTime((string)$portion['end']);
+					$insideWindow = $bs >= $start && $be <= $end;
+				} catch (\Throwable) {
+					$insideWindow = false;
+				}
+			}
+			if ($isAutomatic && !$insideWindow) {
+				$dropped++;
+				continue;
+			}
+			$kept[] = $portion;
+		}
+
+		if ($dropped > 0) {
+			$entry->setBreaks($kept === [] ? null : json_encode(array_values($kept)));
+			\OCP\Log\logger('arbeitszeitcheck')->info('Dropped automatic break portion(s) outside adjusted entry window', [
+				'time_entry_id' => $entry->getId(),
+				'user_id' => $entry->getUserId(),
+				'dropped_portions' => $dropped,
+			]);
+		}
+		return $dropped;
+	}
+
+	/**
 	 * Automatically complete an active entry if maximum daily working hours are reached (ArbZG §3: max 10 hours per day)
 	 * 
 	 * Checks if the total daily working hours (including previous completed entries + current active entry)
@@ -2172,6 +2226,18 @@ class TimeTrackingService
 				}
 
 				$timeEntry->setEndTime($adjustedEndTime);
+
+				// The clamp can strand an automatic break outside the adjusted
+				// window — it was placed against the original end time
+				// (MOMOS: 24h request stored 00:00-10:00 with a break at
+				// 11:37-12:22 still deducting). Drop automatic portions that no
+				// longer fit and re-run placement so the legal requirement
+				// lands inside the stored window instead of becoming phantom
+				// deduction. Manual breaks are NOT touched: validate() rejects
+				// an out-of-window manual break with an honest 400 rather than
+				// silently corrupting or silently discarding user input.
+				$this->dropAutomaticBreaksOutsideWindow($timeEntry);
+				$this->calculateAndSetAutomaticBreak($timeEntry);
 
 				\OCP\Log\logger('arbeitszeitcheck')->info('Time entry end time adjusted to comply with daily maximum working hours', [
 					'time_entry_id' => $timeEntry->getId(),

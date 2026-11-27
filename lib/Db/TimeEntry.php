@@ -949,32 +949,51 @@ class TimeEntry extends Entity
 			}
 		}
 
-		// Validate breaks in JSON array (multiple breaks)
+		// Validate breaks in JSON array (multiple breaks). Elements must be
+		// objects with parseable start/end, end must be after start, and every
+		// break must lie inside the entry's own work window — the legacy
+		// breakStartTime/breakEndTime pair is held to the same bounds above.
 		if ($this->breaks !== null && $this->breaks !== '') {
 			$breaks = json_decode($this->breaks, true) ?? [];
 
 			foreach ($breaks as $index => $break) {
-				if (isset($break['start']) && isset($break['end'])) {
-					try {
-						$breakStart = new \DateTime($break['start']);
-						$breakEnd = new \DateTime($break['end']);
-						$breakDurationSeconds = $breakEnd->getTimestamp() - $breakStart->getTimestamp();
+				if (!is_array($break) || !isset($break['start']) || !isset($break['end'])) {
+					$errors['breaks'] = sprintf('Break #%d must provide start and end times', $index + 1);
+					break;
+				}
+				try {
+					$breakStart = new \DateTime($break['start']);
+					$breakEnd = new \DateTime($break['end']);
+				} catch (\Exception $e) {
+					$errors['breaks'] = 'Invalid break time format in breaks array';
+					break;
+				}
+				$breakDurationSeconds = $breakEnd->getTimestamp() - $breakStart->getTimestamp();
+				if ($breakEnd <= $breakStart) {
+					$errors['breaks'] = sprintf('Break #%d end time must be after its start time', $index + 1);
+					break;
+				}
+				if ($this->startTime && $breakStart < $this->startTime) {
+					$errors['breaks'] = sprintf('Break #%d cannot start before work start time', $index + 1);
+					break;
+				}
+				if ($this->endTime && $breakEnd > $this->endTime) {
+					$errors['breaks'] = sprintf('Break #%d cannot end after work end time', $index + 1);
+					break;
+				}
 
-						// Automatic portions may be shorter than the countable
-						// floor (capped overhang) — only user-recorded breaks
-						// are floor-gated.
-						$isAutomatic = ($break['automatic'] ?? false) === true;
-						if (!$isAutomatic && $breakDurationSeconds < $minBreakDurationSeconds) {
-							$errors['breaks'] = sprintf(
-								'Break #%d must be at least %d minutes long to count toward the legal break requirement. Current duration: %d minutes',
-								$index + 1,
-								$minMinutes,
-								(int)round($breakDurationSeconds / 60)
-							);
-						}
-					} catch (\Exception $e) {
-						$errors['breaks'] = 'Invalid break time format in breaks array';
-					}
+				// Automatic portions may be shorter than the countable
+				// floor (capped overhang) — only user-recorded breaks
+				// are floor-gated.
+				$isAutomatic = ($break['automatic'] ?? false) === true;
+				if (!$isAutomatic && $breakDurationSeconds < $minBreakDurationSeconds) {
+					$errors['breaks'] = sprintf(
+						'Break #%d must be at least %d minutes long to count toward the legal break requirement. Current duration: %d minutes',
+						$index + 1,
+						$minMinutes,
+						(int)round($breakDurationSeconds / 60)
+					);
+					break;
 				}
 			}
 		}

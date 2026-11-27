@@ -85,6 +85,21 @@ class ExportController extends Controller
 		return \OCA\ArbeitszeitCheck\Support\CsvCellSanitizer::sanitize($value);
 	}
 
+	/**
+	 * Accept the common snake_case/short aliases for the date range params so
+	 * a caller who sent `start=`/`start_date=` is not silently handed an
+	 * unfiltered default-range export (MOMOS: silent ignore on a filter
+	 * surface is worse than an error).
+	 *
+	 * @return array{0: ?string, 1: ?string}
+	 */
+	private function dateRangeAliases(?string $startDate, ?string $endDate): array
+	{
+		$startDate = $startDate ?? $this->request->getParam('start_date') ?? $this->request->getParam('start');
+		$endDate = $endDate ?? $this->request->getParam('end_date') ?? $this->request->getParam('end');
+		return [$startDate, $endDate];
+	}
+
 	private function parseDateYmd(?string $value, string $fieldName): ?\DateTime
 	{
 		if ($value === null || trim($value) === '') {
@@ -188,6 +203,7 @@ class ExportController extends Controller
 			$userId = $user->getUID();
 
 		// Determine date range (default to last 30 days if not specified)
+		[$startDate, $endDate] = $this->dateRangeAliases($startDate, $endDate);
 		$end = $this->parseDateYmd($endDate, 'end_date') ?? new \DateTime();
 		// Normalise to midnight of the end date for range calculations and display.
 		$end->setTime(0, 0, 0);
@@ -323,6 +339,7 @@ class ExportController extends Controller
 			$actorUid = $user->getUID();
 
 		// Determine date range (default to last year if not specified)
+		[$startDate, $endDate] = $this->dateRangeAliases($startDate, $endDate);
 		$end = $this->parseDateYmd($endDate, 'end_date') ?? new \DateTime();
 		$end->setTime(0, 0, 0);
 		$start = $this->parseDateYmd($startDate, 'start_date') ?? clone $end;
@@ -651,6 +668,7 @@ class ExportController extends Controller
 			$actorUid = $user->getUID();
 
 		// Determine date range (default to last 30 days if not specified)
+		[$startDate, $endDate] = $this->dateRangeAliases($startDate, $endDate);
 		$end = $this->parseDateYmd($endDate, 'end_date') ?? new \DateTime();
 		$end->setTime(0, 0, 0);
 		$start = $this->parseDateYmd($startDate, 'start_date') ?? clone $end;
@@ -1071,6 +1089,7 @@ class ExportController extends Controller
 	 */
 	private function resolveInclusiveDateRange(?string $startDate, ?string $endDate): array
 	{
+		[$startDate, $endDate] = $this->dateRangeAliases($startDate, $endDate);
 		$end = $this->parseDateYmd($endDate, 'end_date') ?? new \DateTime();
 		$end->setTime(0, 0, 0);
 		$start = $this->parseDateYmd($startDate, 'start_date') ?? clone $end;

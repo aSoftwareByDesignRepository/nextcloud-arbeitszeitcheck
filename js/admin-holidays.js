@@ -1416,6 +1416,13 @@
                 dialog.remove();
             }
         });
+        // Host apps (e.g. core notifications) preventDefault() the Escape keydown
+        // globally, which suppresses the native `cancel` event — close explicitly.
+        dialog.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Escape') {
+                dialog.close();
+            }
+        });
         dialog.showModal();
     }
 
@@ -1637,6 +1644,13 @@
         dialog.addEventListener('close', function() {
             if (dialog.parentNode) {
                 dialog.remove();
+            }
+        });
+        // Host apps (e.g. core notifications) preventDefault() the Escape keydown
+        // globally, which suppresses the native `cancel` event — close explicitly.
+        dialog.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Escape') {
+                dialog.close();
             }
         });
         dialog.showModal();

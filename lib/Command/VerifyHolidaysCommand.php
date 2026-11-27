@@ -90,6 +90,22 @@ class VerifyHolidaysCommand extends Command
 			}
 		}
 
+		if (!empty($report['rules'])) {
+			$io->section('Recurring rules');
+			foreach ($report['rules'] as $rule) {
+				$skipped = $rule['skipped_years'] ?? [];
+				$io->writeln(sprintf(
+					'  %s [%s, %s] resolves %s%s%s',
+					(string)($rule['name'] ?? ''),
+					(string)($rule['rule_key'] ?? ''),
+					(string)($rule['scope'] ?? ''),
+					(string)($rule['resolved_date'] ?? 'n/a'),
+					($rule['active'] ?? true) ? '' : ' — inactive',
+					$skipped !== [] ? ' — skipped years: ' . implode(', ', array_map('strval', $skipped)) : ''
+				));
+			}
+		}
+
 		if (!empty($report['extraInDb'])) {
 			$io->warning('Statutory rows in DB not in catalog for this region (wrong region rules or legacy seed):');
 			foreach ($report['extraInDb'] as $date => $name) {

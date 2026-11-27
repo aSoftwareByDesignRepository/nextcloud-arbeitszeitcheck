@@ -55,7 +55,6 @@ class HolidayRuleServiceTest extends TestCase
 			if ($r->getId() === null) {
 				// Entity::setId throws when id already set — use reflection-safe path.
 				$ref = new \ReflectionProperty($r, 'id');
-				$ref->setAccessible(true);
 				$ref->setValue($r, 42);
 			}
 			return $r;

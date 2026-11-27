@@ -255,6 +255,14 @@ final class TransferManifest extends AbstractTransferManifest
 				'natural_key' => ['state', 'date', 'scope']],
 			'at_holiday_suppress' => ['class' => 'catalog', 'strategy' => 'upsert-natural-key',
 				'natural_key' => ['state', 'date']],
+			// Annually repeating rules + per-year exceptions (V1067).
+			// (state, rule_key, scope) mirrors unique index at_hrules_key_uq;
+			// skips remap rule_id through the rule import.
+			'at_holiday_rules' => ['class' => 'catalog', 'strategy' => 'upsert-natural-key',
+				'natural_key' => ['state', 'rule_key', 'scope']],
+			'at_holiday_rule_skips' => ['class' => 'catalog', 'strategy' => 'upsert-natural-key',
+				'natural_key' => ['rule_id', 'year'],
+				'fk' => ['rule_id' => 'at_holiday_rules'], 'depends_on' => ['at_holiday_rules']],
 
 			// ══ tariff / vacation rule sets ══
 			'at_tariff_rule_sets' => ['class' => 'catalog', 'strategy' => 'upsert-natural-key',

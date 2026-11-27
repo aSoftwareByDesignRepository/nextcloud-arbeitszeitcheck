@@ -3029,12 +3029,7 @@ class AdminController extends Controller
 				try {
 					$rule = $this->holidayRuleService()->createRule($ruleParams, $performedBy);
 				} catch (\OCA\ArbeitszeitCheck\Exception\BusinessRuleException $e) {
-					$status = $e->getReasonCode() === 'holiday_rule_exists' ? Http::STATUS_CONFLICT : Http::STATUS_BAD_REQUEST;
-					return new JSONResponse([
-						'success' => false,
-						'error' => $e->getMessage(),
-						'reason' => $e->getReasonCode(),
-					], $status);
+					return $this->holidayRuleErrorResponse($e);
 				}
 
 				$ruleValues = $rule->toArray();
@@ -3462,9 +3457,26 @@ class AdminController extends Controller
 			$code === 'locked' => Http::STATUS_CONFLICT,
 			default => Http::STATUS_BAD_REQUEST,
 		};
+		// Service messages are authored EN literals — localize them here so
+		// admin-holidays.js never renders an uncatalogued string verbatim.
+		$message = match ($code) {
+			'holiday_rule_exists' => $this->l10n->t('An annual holiday for this day already exists in this region.'),
+			'holiday_rule_skip_before_start' => $this->l10n->t('The rule does not produce a day before its start year.'),
+			'holiday_rule_skip_no_instance' => $this->l10n->t('The rule does not produce a day in this year.'),
+			'holiday_not_found' => $this->l10n->t('Holiday not found'),
+			'holiday_no_date' => $this->l10n->t('Holiday has no date'),
+			'holiday_is_rule_instance' => $this->l10n->t('This entry already belongs to an annual rule'),
+			'holiday_rule_statutory_scope' => $this->l10n->t('Statutory holidays cannot become annual rules.'),
+			'holiday_rule_invalid' => $this->l10n->t('The holiday rule is invalid.'),
+			'invalid_region' => $this->l10n->t('Invalid region code'),
+			'invalid_year' => $this->l10n->t('Invalid year'),
+			'invalid_id' => $this->l10n->t('Invalid holiday rule ID'),
+			'locked' => $this->l10n->t('The holiday catalog is currently locked by another operation. Please try again.'),
+			default => $e->getMessage(),
+		};
 		return new JSONResponse([
 			'success' => false,
-			'error' => $e->getMessage(),
+			'error' => $message,
 			'reason' => $code !== '' ? $code : null,
 		], $status);
 	}

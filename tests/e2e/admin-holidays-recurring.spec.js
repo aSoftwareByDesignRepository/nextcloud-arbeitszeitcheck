@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test'
 import { login, credsFromEnv } from './helpers/auth.js'
-import { api } from './helpers/api.js'
+import { api, apiAllowFailure } from './helpers/api.js'
 
 const STATE = 'NW'
 const RULE_NAME = 'E2E Annual Company Day'
+const RULE_KEY = 'd:08-15'
 const RULE_MONTH = 8
 const RULE_DAY = 15
 
@@ -15,6 +16,44 @@ async function listStateHolidays(page, year) {
 
 function ruleInstance(res, ruleId, ymd) {
 	return (res.holidays || []).find((h) => h.recurring === true && h.rule_id === ruleId && h.date === ymd)
+}
+
+/**
+ * Rule rows are never deleted (stop = deactivate, stays auditable) — a rule
+ * left over from an earlier run or created by the same (state, rule_key,
+ * scope) tuple must be reused, not re-created. Reactivate it so the test
+ * always starts from a producing rule.
+ */
+async function ensureRule(page, startYear) {
+	const created = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/admin/holiday-rules', {
+		data: {
+			state: STATE,
+			name: RULE_NAME,
+			kind: 'full',
+			scope: 'company',
+			anchor: 'date',
+			month: RULE_MONTH,
+			day: RULE_DAY,
+			startYear,
+		},
+	})
+	if (created.ok && created.json?.success === true) {
+		return created.json.rule
+	}
+	// 409 dedup → reuse the existing rule for this anchor.
+	const list = await listStateHolidays(page, startYear)
+	const existing = (list.rules || []).find((r) => r.rule_key === RULE_KEY && r.scope === 'company')
+	test.skip(!existing, 'Anchor date is covered by a persisted row, not a reusable rule')
+	const reactivated = await api(page, 'POST', `/apps/arbeitszeitcheck/api/admin/holiday-rules/${existing.id}/active`, {
+		data: { active: true },
+	})
+	expect(reactivated.success).toBe(true)
+	// Normalize the reused row — a leftover may carry another name/start year.
+	const updated = await api(page, 'PUT', `/apps/arbeitszeitcheck/api/admin/holiday-rules/${existing.id}`, {
+		data: { name: RULE_NAME, startYear: Math.min(startYear, existing.start_year ?? startYear) },
+	})
+	expect(updated.success).toBe(true)
+	return updated.rule
 }
 
 test.describe('Admin recurring holiday rules (AC-B9)', () => {
@@ -30,29 +69,17 @@ test.describe('Admin recurring holiday rules (AC-B9)', () => {
 		let ruleId = null
 
 		try {
-			const created = await api(page, 'POST', '/apps/arbeitszeitcheck/api/admin/holiday-rules', {
-				data: {
-					state: STATE,
-					name: RULE_NAME,
-					kind: 'full',
-					scope: 'company',
-					anchor: 'date',
-					month: RULE_MONTH,
-					day: RULE_DAY,
-					startYear: startYear,
-				},
-			})
-			expect(created.success).toBe(true)
-			expect(created.rule.id).toBeGreaterThan(0)
-			ruleId = created.rule.id
-			expect(created.rule.rule_key).toBe('d:08-15')
-			expect(created.rule.active).toBe(true)
+			const rule = await ensureRule(page, startYear)
+			ruleId = rule.id
+			expect(rule.rule_key).toBe(RULE_KEY)
+			expect(rule.active).toBe(true)
 
 			// Duplicate anchor+scope in the same state → 409 dedup (AC-B7).
-			const dup = await api(page, 'POST', '/apps/arbeitszeitcheck/api/admin/holiday-rules', {
+			// Name is no differentiator — EC-B10.
+			const dup = await apiAllowFailure(page, 'POST', '/apps/arbeitszeitcheck/api/admin/holiday-rules', {
 				data: {
 					state: STATE,
-					name: 'E2E Annual Company Day (duplicate name is no differentiator)',
+					name: 'E2E Annual Company Day (other name)',
 					kind: 'full',
 					scope: 'company',
 					anchor: 'date',
@@ -61,8 +88,8 @@ test.describe('Admin recurring holiday rules (AC-B9)', () => {
 					startYear: startYear,
 				},
 			})
-			expect(dup.success).not.toBe(true)
-			expect(dup.error_code ?? dup.error).toBeTruthy()
+			expect(dup.status).toBe(409)
+			expect(dup.json.reason).toBe('holiday_rule_exists')
 
 			// The instance merges into the start year AND the following year
 			// (read-time expansion — AC-B1, no persisted row needed).
@@ -114,9 +141,10 @@ test.describe('Admin recurring holiday rules (AC-B9)', () => {
 			expect(ruleInstance(listNextStopped, ruleId, ymdNext), 'stopped rule produces nothing (next year)').toBeUndefined()
 		} finally {
 			if (ruleId !== null) {
+				await api(page, 'DELETE', `/apps/arbeitszeitcheck/api/admin/holiday-rules/${ruleId}/skips/${nextYear}`).catch(() => {})
 				await api(page, 'POST', `/apps/arbeitszeitcheck/api/admin/holiday-rules/${ruleId}/active`, {
 					data: { active: false },
-				})
+				}).catch(() => {})
 			}
 		}
 	})
@@ -129,26 +157,8 @@ test.describe('Admin recurring holiday rules (AC-B9)', () => {
 		let ruleId = null
 
 		try {
-			const created = await api(page, 'POST', '/apps/arbeitszeitcheck/api/admin/holiday-rules', {
-				data: {
-					state: STATE,
-					name: RULE_NAME,
-					kind: 'full',
-					scope: 'company',
-					anchor: 'date',
-					month: RULE_MONTH,
-					day: RULE_DAY,
-					startYear: currentYear,
-				},
-			})
-			if (created.success !== true) {
-				const list = await listStateHolidays(page, currentYear)
-				const existing = (list.rules || []).find((r) => r.rule_key === 'd:08-15' && r.scope === 'company')
-				test.skip(!existing, 'Rule already covered by a persisted row on this date')
-				ruleId = existing.id
-			} else {
-				ruleId = created.rule.id
-			}
+			const rule = await ensureRule(page, currentYear)
+			ruleId = rule.id
 
 			await page.goto('/apps/arbeitszeitcheck/admin/holidays')
 			await page.waitForSelector('#holiday-state-select')
@@ -192,7 +202,7 @@ test.describe('Admin recurring holiday rules (AC-B9)', () => {
 				await api(page, 'DELETE', `/apps/arbeitszeitcheck/api/admin/holiday-rules/${ruleId}/skips/${currentYear}`).catch(() => {})
 				await api(page, 'POST', `/apps/arbeitszeitcheck/api/admin/holiday-rules/${ruleId}/active`, {
 					data: { active: false },
-				})
+				}).catch(() => {})
 			}
 		}
 	})
@@ -204,10 +214,19 @@ test.describe('Absence-type paid-gate warning (A-R4)', () => {
 	test('warning appears only while both credit gates are off', async ({ page }) => {
 		await login(page, credsFromEnv('ADMIN'))
 
-		const before = await api(page, 'GET', '/apps/arbeitszeitcheck/api/admin/settings')
+		const before = await api(page, 'GET', '/apps/arbeitszeitcheck/api/admin/notifications/settings')
+		expect(before.success).toBe(true)
+		const beforeSettings = before.settings || {}
 		const orig = {
-			leaveSollEffectsEnabled: before.leaveSollEffectsEnabled === true,
-			paidAbsencePlannedHoursCreditEnabled: before.paidAbsencePlannedHoursCreditEnabled === true,
+			leaveSollEffectsEnabled: beforeSettings.leaveSollEffectsEnabled === true,
+			paidAbsencePlannedHoursCreditEnabled: beforeSettings.paidAbsencePlannedHoursCreditEnabled === true,
+		}
+		// The gate keys alone never populate updatedSettings (400 "No valid
+		// settings") — the real form always posts the bank family alongside.
+		// Echo the current bank values so the write is a no-op for them.
+		const bankEcho = {
+			overtimeBankEnabled: beforeSettings.overtimeBankEnabled === true,
+			overtimeBankMaxHours: Number(beforeSettings.overtimeBankMaxHours ?? 100),
 		}
 		let typeId = null
 
@@ -220,11 +239,15 @@ test.describe('Absence-type paid-gate warning (A-R4)', () => {
 					active: true,
 				},
 			})
-			expect(created.data).toBeTruthy()
-			typeId = created.data.id
+			expect(created.type).toBeTruthy()
+			typeId = created.type.id
 
-			await api(page, 'POST', '/apps/arbeitszeitcheck/api/admin/settings', {
-				data: { leaveSollEffectsEnabled: false, paidAbsencePlannedHoursCreditEnabled: false },
+			await api(page, 'POST', '/apps/arbeitszeitcheck/api/admin/notifications/settings', {
+				data: {
+					...bankEcho,
+					leaveSollEffectsEnabled: false,
+					paidAbsencePlannedHoursCreditEnabled: false,
+				},
 			})
 
 			await page.goto('/apps/arbeitszeitcheck/admin/absence-types')
@@ -235,16 +258,18 @@ test.describe('Absence-type paid-gate warning (A-R4)', () => {
 			await expect(page.locator(`#cat-tbody tr[data-soll-credit="1"]`)).not.toHaveCount(0)
 
 			// Opening either gate silences the warning (OR semantics, AC-A6).
-			await api(page, 'POST', '/apps/arbeitszeitcheck/api/admin/settings', {
-				data: { leaveSollEffectsEnabled: true },
+			await api(page, 'POST', '/apps/arbeitszeitcheck/api/admin/notifications/settings', {
+				data: { ...bankEcho, leaveSollEffectsEnabled: true },
 			})
 			await page.reload()
 			await page.waitForSelector('#cat-tbody')
 			await expect(page.locator('#cat-paid-gate-warning')).toBeHidden()
 		} finally {
-			await api(page, 'POST', '/apps/arbeitszeitcheck/api/admin/settings', { data: orig })
+			await api(page, 'POST', '/apps/arbeitszeitcheck/api/admin/notifications/settings', {
+				data: { ...bankEcho, ...orig },
+			}).catch(() => {})
 			if (typeId !== null) {
-				await api(page, 'DELETE', `/apps/arbeitszeitcheck/api/admin/absence-types/${typeId}`)
+				await api(page, 'DELETE', `/apps/arbeitszeitcheck/api/admin/absence-types/${typeId}`).catch(() => {})
 			}
 		}
 	})

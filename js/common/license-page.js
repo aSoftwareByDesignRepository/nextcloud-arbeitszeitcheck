@@ -838,7 +838,6 @@
 		function highlightSearchOption(index) {
 			const options = getSearchOptions();
 			options.forEach((opt, i) => {
-				opt.setAttribute('aria-selected', i === index ? 'true' : 'false');
 				opt.classList.toggle('is-active', i === index);
 			});
 			const active = options[index];

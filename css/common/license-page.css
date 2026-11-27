@@ -703,8 +703,18 @@ dialog .azc-license-btn--danger:active,
 	background: var(--color-background-hover);
 }
 
-.azc-seat-search-results li[role='option'][aria-selected='true'],
+/* Keyboard cursor (aria-activedescendant target): ring + hover tint —
+   deliberately distinct from the selection affordance below, and placed
+   first so a selected+active row keeps its selection tint. */
 .azc-seat-search-results li[role='option'].is-active {
+	background: var(--color-background-hover);
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: -2px;
+}
+
+/* Selection truth: tint + edge bar + painted check live on
+   aria-selected only — the highlight path must never write it. */
+.azc-seat-search-results li[role='option'][aria-selected='true'] {
 	background: color-mix(in srgb, var(--color-primary-element) 14%, transparent);
 	box-shadow: inset 3px 0 0 var(--color-primary-element);
 }

@@ -5360,6 +5360,7 @@
 	"The recorded absence stays as booked. The employee is notified." : "Det registrerte fraværet beholdes. Medarbeideren varsles.",
 	"The recorded time is invalid." : "Den registrerte tiden er ugyldig.",
 	"The recorded time is outside the allowed range. Check the device clock and try again." : "Den registrerte tiden er utenfor det tillatte området. Sjekk enhetsklokken og prøv igjen.",
+	"The recurring flag is invalid." : "The recurring flag is invalid.",
 	"The region for an employee is set by administrators or managers, for example in %1$sEmployee settings%2$s. If no own region is configured there, the default region configured here is used." : "Regionen for en ansatt settes av administratorer eller ledere, for eksempel under %1$sAnsattinnstillinger%2$s. Hvis det ikke er konfigurert en egen region der, brukes standardregionen her.",
 	"The request changed in the meantime. The list was reloaded." : "Forespørselen endret seg i mellomtiden. Listen ble lastet inn på nytt.",
 	"The request could not be completed." : "Forespørselen kunne ikke fullføres.",

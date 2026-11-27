@@ -5360,6 +5360,7 @@
 	"The recorded absence stays as booked. The employee is notified." : "已记录的缺勤保持不变。员工将收到通知。",
 	"The recorded time is invalid." : "所记录的时间无效。",
 	"The recorded time is outside the allowed range. Check the device clock and try again." : "所记录的时间超出允许范围。请检查设备时钟后重试。",
+	"The recurring flag is invalid." : "The recurring flag is invalid.",
 	"The region for an employee is set by administrators or managers, for example in %1$sEmployee settings%2$s. If no own region is configured there, the default region configured here is used." : "员工的地区由管理员或主管设置，例如在 %1$s员工设置%2$s 中。若那里未配置自有地区，则使用此处配置的默认地区。",
 	"The request changed in the meantime. The list was reloaded." : "申请在此期间已更改。列表已重新加载。",
 	"The request could not be completed." : "请求无法完成。",

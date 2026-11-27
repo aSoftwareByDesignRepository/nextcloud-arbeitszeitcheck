@@ -5359,6 +5359,7 @@
   "The recorded absence stays as booked. The employee is notified.": "De geboekte afwezigheid blijft staan. De medewerker krijgt bericht.",
   "The recorded time is invalid.": "De geregistreerde tijd is ongeldig.",
   "The recorded time is outside the allowed range. Check the device clock and try again.": "De geregistreerde tijd valt buiten het toegestane bereik. Controleer de apparaatklok en probeer het opnieuw.",
+  "The recurring flag is invalid.": "The recurring flag is invalid.",
   "The region for an employee is set by administrators or managers, for example in %1$sEmployee settings%2$s. If no own region is configured there, the default region configured here is used.": "De regio van een medewerker wordt ingesteld door beheerders of leidinggevenden, bijvoorbeeld in %1$sMedewerkersinstellingen%2$s. Als daar geen eigen regio is geconfigureerd, geldt de hier geconfigureerde standaardregio.",
   "The request changed in the meantime. The list was reloaded.": "Het verzoek is inmiddels gewijzigd. De lijst is opnieuw geladen.",
   "The request could not be completed.": "Het verzoek kon niet worden voltooid.",

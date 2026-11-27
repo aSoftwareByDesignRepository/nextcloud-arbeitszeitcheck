@@ -5359,6 +5359,7 @@
   "The recorded absence stays as booked. The employee is notified.": "L’absence enregistrée est conservée. L’employé est informé.",
   "The recorded time is invalid.": "L’heure enregistrée est invalide.",
   "The recorded time is outside the allowed range. Check the device clock and try again.": "L’heure enregistrée est hors de la plage autorisée. Vérifiez l’horloge de l’appareil et réessayez.",
+  "The recurring flag is invalid.": "The recurring flag is invalid.",
   "The region for an employee is set by administrators or managers, for example in %1$sEmployee settings%2$s. If no own region is configured there, the default region configured here is used.": "La région d’un employé est définie par les administrateurs ou responsables, par exemple dans %1$sParamètres employé%2$s. Si aucune région propre n’y est configurée, la région par défaut configurée ici est utilisée.",
   "The request changed in the meantime. The list was reloaded.": "La demande a changé entre-temps. La liste a été rechargée.",
   "The request could not be completed.": "La demande n'a pas pu aboutir.",

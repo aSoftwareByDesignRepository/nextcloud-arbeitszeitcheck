@@ -5360,6 +5360,7 @@
 	"The recorded absence stays as booked. The employee is notified." : "A ausência registrada permanece como lançada. O funcionário é notificado.",
 	"The recorded time is invalid." : "O horário registrado é inválido.",
 	"The recorded time is outside the allowed range. Check the device clock and try again." : "O horário registrado está fora do intervalo permitido. Verifique o relógio do dispositivo e tente novamente.",
+	"The recurring flag is invalid." : "The recurring flag is invalid.",
 	"The region for an employee is set by administrators or managers, for example in %1$sEmployee settings%2$s. If no own region is configured there, the default region configured here is used." : "A região de um funcionário é definida por administradores ou gerentes, por exemplo, em %1$sConfigurações de funcionário%2$s. Se nenhuma região própria estiver configurada lá, a região padrão configurada aqui será usada.",
 	"The request changed in the meantime. The list was reloaded." : "A solicitação mudou nesse meio-tempo. A lista foi recarregada.",
 	"The request could not be completed." : "Não foi possível concluir a solicitação.",

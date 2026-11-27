@@ -2996,8 +2996,15 @@ class AdminController extends Controller
 			// single-year row. Rules are company/custom scope only —
 			// statutory days stay exclusively catalog-managed.
 			$recurringParam = $params['recurring'] ?? null;
-			$recurring = $recurringParam === true || $recurringParam === 1
-				|| $recurringParam === '1' || $recurringParam === 'true';
+			if ($recurringParam !== null
+				&& !in_array($recurringParam, [true, 1, '1', 'true', 'on', false, 0, '0', 'false', 'off'], true)) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('The recurring flag is invalid.'),
+					'reason' => 'invalid_param',
+				], Http::STATUS_BAD_REQUEST);
+			}
+			$recurring = in_array($recurringParam, [true, 1, '1', 'true', 'on'], true);
 			if ($recurring && $id > 0) {
 				return new JSONResponse([
 					'success' => false,
@@ -3428,14 +3435,19 @@ class AdminController extends Controller
 			$activeParam = $this->request->getParam('active', null);
 			// A missing/unknown value must NOT silently read as "stop the
 			// series" — require an explicit boolean-ish payload.
-			if ($activeParam === null || $activeParam === '') {
+			$truthy = [true, 1, '1', 'true', 'on'];
+			$falsy = [false, 0, '0', 'false', 'off'];
+			if (in_array($activeParam, $truthy, true)) {
+				$active = true;
+			} elseif (in_array($activeParam, $falsy, true)) {
+				$active = false;
+			} else {
 				return new JSONResponse([
 					'success' => false,
 					'error' => $this->l10n->t('The active flag is required.'),
 					'reason' => 'invalid_param',
 				], Http::STATUS_BAD_REQUEST);
 			}
-			$active = $activeParam === true || $activeParam === 1 || $activeParam === '1' || $activeParam === 'true';
 			$performedBy = $this->getPerformedBy();
 			// Old values are captured inside the service under the named
 			// lock — a pre-read here could race another admin writer.

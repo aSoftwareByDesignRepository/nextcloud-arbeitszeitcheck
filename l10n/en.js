@@ -5360,6 +5360,7 @@
 	"The recorded absence stays as booked. The employee is notified." : "The recorded absence stays as booked. The employee is notified.",
 	"The recorded time is invalid." : "The recorded time is invalid.",
 	"The recorded time is outside the allowed range. Check the device clock and try again." : "The recorded time is outside the allowed range. Check the device clock and try again.",
+	"The recurring flag is invalid." : "The recurring flag is invalid.",
 	"The region for an employee is set by administrators or managers, for example in %1$sEmployee settings%2$s. If no own region is configured there, the default region configured here is used." : "The region for an employee is set by administrators or managers, for example in %1$sEmployee settings%2$s. If no own region is configured there, the default region configured here is used.",
 	"The request changed in the meantime. The list was reloaded." : "The request changed in the meantime. The list was reloaded.",
 	"The request could not be completed." : "The request could not be completed.",

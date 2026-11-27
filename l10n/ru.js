@@ -5360,6 +5360,7 @@
 	"The recorded absence stays as booked. The employee is notified." : "Проведённое отсутствие сохраняется. Сотрудник получит уведомление.",
 	"The recorded time is invalid." : "Записанное время является недействительным.",
 	"The recorded time is outside the allowed range. Check the device clock and try again." : "Записанное время находится за пределами допустимого диапазона. Проверьте часы устройства и попробуйте еще раз.",
+	"The recurring flag is invalid." : "The recurring flag is invalid.",
 	"The region for an employee is set by administrators or managers, for example in %1$sEmployee settings%2$s. If no own region is configured there, the default region configured here is used." : "Регион для сотрудника устанавливается администраторами или менеджерами, например, в настройках %1$sEmployee%2$s. Если там не настроена собственная область, используется область по умолчанию, настроенная здесь.",
 	"The request changed in the meantime. The list was reloaded." : "Запрос тем временем изменился. Список был перезагружен.",
 	"The request could not be completed." : "Запрос не мог быть выполнен.",

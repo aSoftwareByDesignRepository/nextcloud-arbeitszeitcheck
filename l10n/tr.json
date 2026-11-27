@@ -5359,6 +5359,7 @@
   "The recorded absence stays as booked. The employee is notified.": "Kayıtlı devamsızlık aynen kalır. Çalışana bildirim gönderilir.",
   "The recorded time is invalid.": "Kaydedilen saat geçersiz.",
   "The recorded time is outside the allowed range. Check the device clock and try again.": "Kaydedilen saat izin verilen aralığın dışında. Cihaz saatini kontrol edip yeniden deneyin.",
+  "The recurring flag is invalid.": "The recurring flag is invalid.",
   "The region for an employee is set by administrators or managers, for example in %1$sEmployee settings%2$s. If no own region is configured there, the default region configured here is used.": "Çalışanın bölgesi, yöneticiler veya ekip yöneticileri tarafından örneğin %1$sÇalışan ayarları%2$s altında belirlenir. Orada özel bir bölge yapılandırılmadıysa burada yapılandırılan varsayılan bölge kullanılır.",
   "The request changed in the meantime. The list was reloaded.": "Talep bu sırada değişti. Liste yeniden yüklendi.",
   "The request could not be completed.": "İstek tamamlanamadı.",

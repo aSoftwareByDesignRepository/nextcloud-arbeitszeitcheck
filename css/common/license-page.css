@@ -722,6 +722,29 @@ dialog .azc-license-btn--danger:active,
 	height: 1.1rem;
 	margin: 0;
 	flex: 0 0 auto;
+	display: inline-block;
+	position: relative;
+	box-sizing: border-box;
+	border: 1px solid var(--color-border-dark, var(--color-border));
+	border-radius: var(--azc-radius-sm, 3px);
+	background: var(--color-main-background);
+}
+
+.azc-seat-search-results li[role='option'][aria-selected='true'] .azc-seat-search-results__check {
+	background: var(--color-primary-element);
+	border-color: var(--color-primary-element);
+}
+
+.azc-seat-search-results li[role='option'][aria-selected='true'] .azc-seat-search-results__check::after {
+	content: '';
+	position: absolute;
+	left: 50%;
+	top: 45%;
+	width: 30%;
+	height: 55%;
+	border: solid var(--color-primary-element-text, var(--color-primary-text));
+	border-width: 0 2px 2px 0;
+	transform: translate(-50%, -50%) rotate(45deg);
 }
 
 .azc-seat-search-results__empty {

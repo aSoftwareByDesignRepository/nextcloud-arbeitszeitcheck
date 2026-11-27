@@ -877,26 +877,23 @@
 					li.dataset.userId = uid;
 					li.className = p + '-seat-search-results__option';
 
-					const label = document.createElement('label');
-					label.className = p + '-seat-search-results__label';
-					const cb = document.createElement('input');
-					cb.type = 'checkbox';
-					cb.className = p + '-seat-search-results__check';
-					cb.checked = pendingSeatSelection.has(uid);
-					cb.setAttribute('aria-label', display + ' (' + uid + ')');
-					cb.addEventListener('change', () => {
-						togglePendingSeat({ id: uid, userId: uid, displayName: display }, cb.checked);
-						li.setAttribute('aria-selected', cb.checked ? 'true' : 'false');
-					});
+					const row = document.createElement('span');
+					row.className = p + '-seat-search-results__label';
+					const check = document.createElement('span');
+					check.className = p + '-seat-search-results__check';
+					check.setAttribute('aria-hidden', 'true');
 					const text = document.createElement('span');
 					text.textContent = display + ' (' + uid + ')';
-					label.appendChild(cb);
-					label.appendChild(text);
-					li.appendChild(label);
+					row.appendChild(check);
+					row.appendChild(text);
+					li.appendChild(row);
 					li.addEventListener('mousedown', (e) => {
-						if (e.target !== cb) {
-							e.preventDefault();
-						}
+						e.preventDefault();
+					});
+					li.addEventListener('click', () => {
+						const checked = !pendingSeatSelection.has(uid);
+						togglePendingSeat({ id: uid, userId: uid, displayName: display }, checked);
+						li.setAttribute('aria-selected', checked ? 'true' : 'false');
 					});
 					searchResults.appendChild(li);
 				});
@@ -1075,10 +1072,8 @@
 				} else if (e.key === 'Enter' && searchActiveIndex >= 0) {
 					e.preventDefault();
 					const opt = options[searchActiveIndex];
-					const cb = opt && opt.querySelector('input[type="checkbox"]');
-					if (cb) {
-						cb.checked = !cb.checked;
-						cb.dispatchEvent(new Event('change', { bubbles: true }));
+					if (opt) {
+						opt.click();
 					}
 				} else if (e.key === 'Escape') {
 					e.preventDefault();

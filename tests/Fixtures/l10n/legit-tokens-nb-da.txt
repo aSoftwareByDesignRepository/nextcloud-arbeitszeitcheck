@@ -533,6 +533,7 @@ helligdags
 helligdagskalender
 helligdagskalendere
 helligdagsnavn
+helligdagsregel
 helligdagsregion
 helst
 hemmelig

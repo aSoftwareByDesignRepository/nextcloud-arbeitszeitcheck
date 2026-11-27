@@ -437,4 +437,128 @@ class HolidayRuleServiceTest extends TestCase
 		$this->assertSame([2026, 2027], $out[0]['skipped_years']);
 		$this->assertSame('d:12-24', $out[0]['rule_key']);
 	}
+
+	// ---------- audit-capture under the lock ----------
+
+	public function testUpdateRuleExposesOldValuesCapturedUnderLock(): void
+	{
+		$stored = $this->storedRule(['name' => 'Old name', 'kind' => Holiday::KIND_FULL]);
+		$this->ruleMapper->method('findById')->willReturn($stored);
+
+		$oldValues = null;
+		$rule = $this->service->updateRule(5, ['name' => 'New name', 'kind' => 'half'], 'admin2', $oldValues);
+
+		$this->assertIsArray($oldValues);
+		$this->assertSame('Old name', $oldValues['name']);
+		$this->assertSame(Holiday::KIND_FULL, $oldValues['kind']);
+		$this->assertSame('New name', $rule->getName());
+	}
+
+	public function testSetActiveExposesOldValuesCapturedUnderLock(): void
+	{
+		$stored = $this->storedRule(['active' => true]);
+		$this->ruleMapper->method('findById')->willReturn($stored);
+
+		$oldValues = null;
+		$this->service->setActive(5, false, 'admin2', $oldValues);
+
+		$this->assertIsArray($oldValues);
+		$this->assertTrue($oldValues['active']);
+	}
+
+	public function testConvertHolidayToRuleExposesDeletedRow(): void
+	{
+		$row = new Holiday();
+		$row->setId(20);
+		$row->setState('NW');
+		$row->setDate(new \DateTime('2027-12-24'));
+		$row->setName('Heiligabend');
+		$row->setKind(Holiday::KIND_FULL);
+		$row->setScope(Holiday::SCOPE_COMPANY);
+		$row->setSource(Holiday::SOURCE_MANUAL);
+
+		$this->holidayMapper->method('findById')->willReturn($row);
+		$this->ruleMapper->method('findIdForStateRuleKeyScope')->willReturn(null);
+
+		$deletedRow = null;
+		$this->service->convertHolidayToRule(20, 'admin1', $deletedRow);
+		$this->assertSame($row, $deletedRow);
+	}
+
+	// ---------- unique-constraint backstop (lock provider absent) ----------
+
+	private function uniqueViolation(): \OCP\DB\Exception
+	{
+		return new class('duplicate') extends \OCP\DB\Exception {
+			public function getReason(): ?int
+			{
+				return self::REASON_UNIQUE_CONSTRAINT_VIOLATION;
+			}
+		};
+	}
+
+	public function testCreateRuleMapsUniqueViolationToConflict(): void
+	{
+		$insert = new class('duplicate') extends \OCP\DB\Exception {
+			public function getReason(): ?int
+			{
+				return self::REASON_UNIQUE_CONSTRAINT_VIOLATION;
+			}
+		};
+		$mapper = $this->createMock(HolidayRuleMapper::class);
+		$mapper->method('findIdForStateRuleKeyScope')->willReturn(null);
+		$mapper->method('insert')->willThrowException($insert);
+		$service = new HolidayRuleService(
+			$mapper,
+			$this->skipMapper,
+			$this->holidayMapper,
+			$this->holidayService
+		);
+
+		try {
+			$service->createRule([
+				'state' => 'NW',
+				'date' => '2026-12-24',
+				'name' => 'Company day',
+				'kind' => 'full',
+				'scope' => 'company',
+				'start_year' => 2026,
+			], 'admin1');
+			$this->fail('expected BusinessRuleException');
+		} catch (BusinessRuleException $e) {
+			$this->assertSame('holiday_rule_exists', $e->getReasonCode());
+		}
+	}
+
+	public function testAddSkipSwallowsUniqueViolationAsIdempotent(): void
+	{
+		$stored = $this->storedRule(['start_year' => 2025]);
+		$this->ruleMapper->method('findById')->willReturn($stored);
+		$this->skipMapper->method('existsForRuleAndYear')->willReturn(false);
+		$this->skipMapper->method('insert')->willThrowException($this->uniqueViolation());
+
+		// Must not throw — a racing writer already recorded the same skip.
+		$this->service->addSkip(5, 2027, 'admin2');
+		$this->addToAssertionCount(1);
+	}
+
+	// ---------- column-length validation (name/name_msgid are VARCHAR(255)) ----------
+
+	public function testCreateRejectsNameLongerThanColumn(): void
+	{
+		try {
+			$this->service->createRule([
+				'state' => 'NW',
+				'date' => '2026-12-24',
+				'name' => str_repeat('x', 256),
+				'kind' => 'full',
+				'scope' => 'company',
+				'start_year' => 2026,
+			], 'admin1');
+			$this->fail('expected BusinessRuleException');
+		} catch (BusinessRuleException $e) {
+			$this->assertSame('holiday_rule_invalid', $e->getReasonCode());
+			$this->assertStringContainsString('name', (string)($e->getDetails()['fields'] ?? ''));
+		}
+	}
 }

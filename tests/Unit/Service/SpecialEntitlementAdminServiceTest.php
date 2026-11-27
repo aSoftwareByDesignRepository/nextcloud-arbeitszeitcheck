@@ -619,4 +619,96 @@ final class SpecialEntitlementAdminServiceTest extends TestCase
 		$this->expectException(SpecialEntitlementException::class);
 		$this->service->setTypeActive(7, true, 3, 'admin');
 	}
+
+	/**
+	 * Regression: applyPaidLeaveToLinkedType used to write
+	 * $this->sollCreditByCode[code] unconditionally — auto-vivifying the
+	 * null memo into a 1-entry map. On the createType link path (the only
+	 * call that can precede the first findAll() lazy-load in a request),
+	 * paidLeaveForType then treated the map as fully loaded and reported
+	 * null for every OTHER custom type.
+	 */
+	public function testPaidLeaveWriteThroughDoesNotPoisonSiblingTypeMemo(): void
+	{
+		// Seed the static catalog so assertCreatableAbsenceType accepts the
+		// pre-existing custom_a the new entitlement links to.
+		foreach (['custom_a' => false, 'custom_b' => true] as $code => $credit) {
+			$seed = new CustomAbsenceType();
+			$seed->setCode($code);
+			$seed->setSollCredit($credit);
+			$seed->setActive(true);
+			$seed->setMaxDays(365);
+			$cat = new \ReflectionClass(\OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::class);
+			$loaded = $cat->getProperty('customLoaded');
+			$loaded->setValue(null, true);
+			$cache = $cat->getProperty('customCache');
+			$cache->setValue(null, array_merge((array)$cache->getValue(), [$code => $seed]));
+		}
+		try {
+			$cA = new CustomAbsenceType();
+			$cA->setCode('custom_a');
+			$cA->setLabel('A');
+			$cA->setSollCredit(false);
+			$cA->setMaxDays(365);
+			$cA->setColor('info');
+			$cA->setIcon('calendar');
+			$cB = new CustomAbsenceType();
+			$cB->setCode('custom_b');
+			$cB->setLabel('B');
+			$cB->setSollCredit(true);
+
+			$sibling = $this->type(true);
+			$sibling->setId(2);
+			$sibling->setCode('custom_other');
+			$sibling->setAbsenceTypeCode('custom_b');
+
+			$created = null;
+			$this->types->method('findByCode')->willReturn(null);
+			$this->types->method('findByAbsenceTypeCode')->willReturn(null);
+			$this->types->method('insert')->willReturnCallback(
+				static function (SpecialEntitlementType $row) use (&$created): SpecialEntitlementType {
+					$row->setId(1);
+					$created = $row;
+					return $row;
+				}
+			);
+			$this->types->method('findAll')->willReturnCallback(
+				static function () use (&$created, $sibling): array {
+					return array_values(array_filter([$created, $sibling]));
+				}
+			);
+			$this->policies->method('findByType')->willReturn([]);
+			$this->customTypes->method('findByCode')->willReturnCallback(
+				static function (string $code) use ($cA, $cB): CustomAbsenceType {
+					return match ($code) {
+						'custom_a' => $cA,
+						'custom_b' => $cB,
+						default => throw new DoesNotExistException('missing'),
+					};
+				}
+			);
+			$this->customTypes->method('findAll')->willReturn([$cA, $cB]);
+			$this->customTypes->method('update')->willReturnArgument(0);
+
+			// Link-create: applyPaidLeaveToLinkedType runs BEFORE the first
+			// adminTypeSummary — under the bug it vivified the memo with only
+			// custom_a, so the sibling later resolved paidLeave = null.
+			$this->service->createType([
+				'publicLabel' => 'Linked Leave',
+				'code' => 'custom_linked_x',
+				'absenceTypeCode' => 'custom_a',
+				'unit' => 'days',
+				'periodType' => 'calendar_year',
+				'paidLeave' => true,
+			], 'admin');
+			self::assertTrue($cA->getSollCredit());
+
+			$list = $this->service->listTypes();
+			$byId = array_column($list, null, 'id');
+			self::assertTrue($byId[1]['paidLeave'], 'Linked type must report the written flag');
+			self::assertTrue($byId[2]['paidLeave'], 'Sibling type must not be poisoned to null');
+		} finally {
+			\OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog::resetCustomTypeCache();
+		}
+	}
 }

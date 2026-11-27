@@ -5265,6 +5265,7 @@
 	"The absence stays approved. The employee is notified." : "L'assenza resta approvata. Il dipendente viene avvisato.",
 	"The absence type could not be deleted. Please try again — if the problem persists, report the error." : "Il tipo di assenza non è stato eliminato. Riprova; se il problema persiste, segnala l'errore.",
 	"The absence type could not be saved. Please try again — if the problem persists, report the error." : "Il tipo di assenza non è stato salvato. Riprova; se il problema persiste, segnala l'errore.",
+	"The active flag is required." : "The active flag is required.",
 	"The additional working blocks are removed. The first block of each working day is kept." : "I blocchi di lavoro aggiuntivi vengono rimossi. Il primo blocco di ogni giorno lavorativo viene mantenuto.",
 	"The approved absence is cancelled. The employee is notified." : "L'assenza approvata viene annullata. Il dipendente viene avvisato.",
 	"The approved split decision can no longer be applied to the corrected times. Reload the entry and submit a new correction." : "La decisione di divisione approvata non può più essere applicata agli orari corretti. Ricarica la voce e invia una nuova correzione.",

@@ -1,6 +1,27 @@
 import { test, expect } from '@playwright/test'
+import { execFileSync } from 'node:child_process'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { login, credsFromEnv } from './helpers/auth.js'
 import { api, apiAllowFailure } from './helpers/api.js'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const COMPOSE_CWD = path.resolve(__dirname, '../../..')
+
+/**
+ * Deterministic cleanup for this spec's custom absence type — the API
+ * DELETE can refuse (catalog locked / usage) and the finally-block catch
+ * would hide it, leaking active rows that poison AbsenceTypeCatalogTest.
+ */
+function dbDeleteGateWarningTypes() {
+	const sql = `DELETE FROM oc_at_custom_absence WHERE label LIKE 'E2E Gate Warning%'`
+	try {
+		execFileSync('docker', [
+			'compose', 'exec', '-T', 'mariadb', 'mariadb',
+			'-u', 'nextcloud', '-pnextcloud_password', 'nextcloud', '-e', sql,
+		], { cwd: COMPOSE_CWD, encoding: 'utf8', timeout: 60_000 })
+	} catch { /* best-effort */ }
+}
 
 const STATE = 'NW'
 const RULE_NAME = 'E2E Annual Company Day'
@@ -271,6 +292,7 @@ test.describe('Absence-type paid-gate warning (A-R4)', () => {
 			if (typeId !== null) {
 				await api(page, 'DELETE', `/apps/arbeitszeitcheck/api/admin/absence-types/${typeId}`).catch(() => {})
 			}
+			dbDeleteGateWarningTypes()
 		}
 	})
 })

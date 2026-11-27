@@ -441,6 +441,7 @@ final class AtlasApiEndpointHappyAuthzTest extends TestCase
 		'AdminController::updateTariffRuleSet' => ['modules' => [['moduleType' => 'base_formula', 'config' => ['reference_days' => 260, 'reference_week_days' => 5]]]],
 		// Required-key guards (missing key must not silently write the toggle).
 		'AdminController::setTeamsUseAppTeams' => ['useAppTeams' => true],
+		'AdminController::setHolidayRuleActive' => ['active' => true],
 		// Split-service preview: valid v2 draft with two Monday blocks so the
 		// happy-path probe reaches the engine instead of SCHEDULE_INVALID.
 		// Split audit caps the range at 92 days — the generic full-year

@@ -70,21 +70,6 @@ class HolidayRuleService
 	}
 
 	/**
-	 * Stored rule values for old-state audit logging (controller reads
-	 * before mutation; returns the raw toArray snapshot).
-	 *
-	 * @return array<string,mixed>|null
-	 */
-	public function getRuleForAudit(int $id): ?array
-	{
-		try {
-			return $this->ruleMapper->findById($id)->toArray();
-		} catch (\Throwable) {
-			return null;
-		}
-	}
-
-	/**
 	 * Whether an active (non-skipped) rule already covers a resolved date —
 	 * the shadow-check behind the "this date is covered by the annual rule
 	 * X — your entry replaces the rule instance for {year}" hint (B-R5/B-R7).
@@ -176,7 +161,7 @@ class HolidayRuleService
 			$rule->setUpdatedBy($actorUid !== '' ? $actorUid : null);
 			$rule->setUpdatedAt(new \DateTime());
 			/** @var HolidayRule $saved */
-			$saved = $this->ruleMapper->insert($rule);
+			$saved = $this->insertRuleBackstopped($rule);
 			$this->holidayCalendarService->resetMemoForState($saved->getState());
 			return $saved;
 		} finally {
@@ -190,12 +175,16 @@ class HolidayRuleService
 	 *
 	 * @param array<string,mixed> $params
 	 */
-	public function updateRule(int $id, array $params, string $actorUid): HolidayRule
+	public function updateRule(int $id, array $params, string $actorUid, ?array &$oldValues = null): HolidayRule
 	{
 		$lock = DbLockKeys::policyCatalog('holiday');
 		$this->acquireLock($lock);
 		try {
 			$rule = $this->requireRule($id);
+			// Capture pre-write values under the lock — a controller-side
+			// pre-read before this call can race another writer and log
+			// wrong "old" audit values.
+			$oldValues = $rule->toArray();
 			$updated = $this->buildRuleFromParams($params, $rule);
 
 			// Anchor/key change ⇒ re-dedup against every other rule.
@@ -235,12 +224,15 @@ class HolidayRuleService
 	/**
 	 * Reversible series stop/continue (B-R6). Skips stay stored but inert.
 	 */
-	public function setActive(int $id, bool $active, string $actorUid): HolidayRule
+	public function setActive(int $id, bool $active, string $actorUid, ?array &$oldValues = null): HolidayRule
 	{
 		$lock = DbLockKeys::policyCatalog('holiday');
 		$this->acquireLock($lock);
 		try {
 			$rule = $this->requireRule($id);
+			// Same under-lock capture — callers log audit old/new without
+			// a separate pre-read.
+			$oldValues = $rule->toArray();
 			$rule->setActive($active);
 			$rule->setUpdatedBy($actorUid !== '' ? $actorUid : null);
 			$rule->setUpdatedAt(new \DateTime());
@@ -284,7 +276,15 @@ class HolidayRuleService
 				$skip->setYear($year);
 				$skip->setCreatedBy($actorUid !== '' ? $actorUid : null);
 				$skip->setCreatedAt(new \DateTime());
-				$this->skipMapper->insert($skip);
+				try {
+					$this->skipMapper->insert($skip);
+				} catch (\OCP\DB\Exception $e) {
+					// Unique (rule_id, year) hit means another writer already
+					// recorded the same skip — adding it is idempotent.
+					if ($e->getReason() !== \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+						throw $e;
+					}
+				}
 			}
 			$this->holidayCalendarService->resetMemoForState($rule->getState());
 		} finally {
@@ -312,7 +312,7 @@ class HolidayRuleService
 	 * The rule anchors on the row's fixed month/day — never an easter guess
 	 * (date-equality inference is forbidden by B-R4).
 	 */
-	public function convertHolidayToRule(int $holidayId, string $actorUid): HolidayRule
+	public function convertHolidayToRule(int $holidayId, string $actorUid, ?Holiday &$deletedRow = null): HolidayRule
 	{
 		$lock = DbLockKeys::policyCatalog('holiday');
 		$this->acquireLock($lock);
@@ -366,9 +366,13 @@ class HolidayRuleService
 			$rule->setUpdatedBy($actorUid !== '' ? $actorUid : null);
 			$rule->setUpdatedAt(new \DateTime());
 			/** @var HolidayRule $saved */
-			$saved = $this->ruleMapper->insert($rule);
+			$saved = $this->insertRuleBackstopped($rule);
 
 			$this->holidayMapper->deleteById($holidayId);
+			// Expose the removed row so the caller can write a
+			// state_holiday_deleted audit entry — without this the
+			// row disappears from at_holidays with no trace.
+			$deletedRow = $row;
 			$this->holidayCalendarService->resetMemoForState($rule->getState());
 			return $saved;
 		} finally {
@@ -495,6 +499,29 @@ class HolidayRuleService
 	{
 		if ($year < self::YEAR_MIN || $year > self::YEAR_MAX) {
 			throw new BusinessRuleException('Invalid year', 'invalid_year', ['year' => $year]);
+		}
+	}
+
+	/**
+	 * Insert with the unique (state, rule_key, scope) backstop mapped to the
+	 * same 409 the check-then-insert path produces — the named lock is the
+	 * primary serialiser, the DB constraint is the last line when the lock
+	 * provider is absent.
+	 */
+	private function insertRuleBackstopped(HolidayRule $rule): HolidayRule
+	{
+		try {
+			/** @var HolidayRule $saved */
+			$saved = $this->ruleMapper->insert($rule);
+			return $saved;
+		} catch (\OCP\DB\Exception $e) {
+			if ($e->getReason() === \OCP\DB\Exception::REASON_UNIQUE_CONSTRAINT_VIOLATION) {
+				throw new BusinessRuleException(
+					'An annual holiday for this day already exists in this region.',
+					'holiday_rule_exists'
+				);
+			}
+			throw $e;
 		}
 	}
 

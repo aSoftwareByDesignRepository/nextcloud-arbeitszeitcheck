@@ -5265,6 +5265,7 @@
 	"The absence stays approved. The employee is notified." : "Frånvaron förblir godkänd. Den anställde underrättas.",
 	"The absence type could not be deleted. Please try again — if the problem persists, report the error." : "Frånvarotypen kunde inte tas bort. Försök igen – om problemet kvarstår, rapportera felet.",
 	"The absence type could not be saved. Please try again — if the problem persists, report the error." : "Frånvarotypen kunde inte sparas. Försök igen – om problemet kvarstår, rapportera felet.",
+	"The active flag is required." : "The active flag is required.",
 	"The additional working blocks are removed. The first block of each working day is kept." : "De extra arbetsblocken tas bort. Det första blocket varje arbetsdag behålls.",
 	"The approved absence is cancelled. The employee is notified." : "Den godkända frånvaron avbokas. Den anställde underrättas.",
 	"The approved split decision can no longer be applied to the corrected times. Reload the entry and submit a new correction." : "Det godkända uppdelningsbeslutet kan inte längre tillämpas på de korrigerade tiderna. Läs om posten och skicka in en ny korrigering.",

@@ -23,7 +23,7 @@ $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class
 $absenceTypes = $_['absenceTypes'] ?? [];
 $localeOptions = $_['localeOptions'] ?? [];
 $leaveSollEffectsEnabled = (bool)($_['leaveSollEffectsEnabled'] ?? true);
-$paidAbsenceCreditEnabled = (bool)($_['paidAbsencePlannedHoursCreditEnabled'] ?? false);
+$paidAbsenceCreditEnabled = (bool)($_['paidAbsenceCreditEnabled'] ?? false);
 $overtimeSettingsUrl = (string)($_['overtimeSettingsUrl'] ?? '');
 
 // A-R4: a soll_credit type only credits while at least one paid-credit gate is

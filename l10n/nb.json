@@ -5264,6 +5264,7 @@
   "The absence stays approved. The employee is notified.": "Fraværet forblir godkjent. Den ansatte varsles.",
   "The absence type could not be deleted. Please try again — if the problem persists, report the error.": "Fraværstypen kunne ikke slettes. Prøv igjen – hvis problemet vedvarer, rapporter feilen.",
   "The absence type could not be saved. Please try again — if the problem persists, report the error.": "Fraværstypen kunne ikke lagres. Prøv igjen – hvis problemet vedvarer, rapporter feilen.",
+  "The active flag is required.": "The active flag is required.",
   "The additional working blocks are removed. The first block of each working day is kept.": "De ekstra arbeidsblokkene fjernes. Den første blokken på hver arbeidsdag beholdes.",
   "The approved absence is cancelled. The employee is notified.": "Det godkjente fraværet kanselleres. Den ansatte varsles.",
   "The approved split decision can no longer be applied to the corrected times. Reload the entry and submit a new correction.": "Den godkjente oppdelingsbeslutningen kan ikke lenger brukes på de korrigerte tidene. Last inn oppføringen på nytt og send inn en ny korrigering.",

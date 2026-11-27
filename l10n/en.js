@@ -5265,6 +5265,7 @@
 	"The absence stays approved. The employee is notified." : "The absence stays approved. The employee is notified.",
 	"The absence type could not be deleted. Please try again — if the problem persists, report the error." : "The absence type could not be deleted. Please try again — if the problem persists, report the error.",
 	"The absence type could not be saved. Please try again — if the problem persists, report the error." : "The absence type could not be saved. Please try again — if the problem persists, report the error.",
+	"The active flag is required." : "The active flag is required.",
 	"The additional working blocks are removed. The first block of each working day is kept." : "The additional working blocks are removed. The first block of each working day is kept.",
 	"The approved absence is cancelled. The employee is notified." : "The approved absence is cancelled. The employee is notified.",
 	"The approved split decision can no longer be applied to the corrected times. Reload the entry and submit a new correction." : "The approved split decision can no longer be applied to the corrected times. Reload the entry and submit a new correction.",

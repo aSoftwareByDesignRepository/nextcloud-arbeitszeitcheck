@@ -5264,6 +5264,7 @@
   "The absence stays approved. The employee is notified.": "请假保持已批准。已通知员工。",
   "The absence type could not be deleted. Please try again — if the problem persists, report the error.": "无法删除缺勤类型。请重试——如果问题仍然存在，请报告错误。",
   "The absence type could not be saved. Please try again — if the problem persists, report the error.": "无法保存缺勤类型。请重试——如果问题仍然存在，请报告错误。",
+  "The active flag is required.": "The active flag is required.",
   "The additional working blocks are removed. The first block of each working day is kept.": "额外的工作块将被移除，每个工作日的第一个工作块将保留。",
   "The approved absence is cancelled. The employee is notified.": "已批准的请假被取消。已通知员工。",
   "The approved split decision can no longer be applied to the corrected times. Reload the entry and submit a new correction.": "已批准的拆分决定无法再应用于更正后的时间。请重新加载该记录并提交新的更正。",

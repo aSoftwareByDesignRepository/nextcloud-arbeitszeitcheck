@@ -5265,6 +5265,7 @@
 	"The absence stays approved. The employee is notified." : "Отсутствие остаётся одобренным. Сотрудник уведомлён.",
 	"The absence type could not be deleted. Please try again — if the problem persists, report the error." : "Не удалось удалить тип отсутствия. Повторите попытку — если проблема сохраняется, сообщите об ошибке.",
 	"The absence type could not be saved. Please try again — if the problem persists, report the error." : "Не удалось сохранить тип отсутствия. Повторите попытку — если проблема сохраняется, сообщите об ошибке.",
+	"The active flag is required." : "The active flag is required.",
 	"The additional working blocks are removed. The first block of each working day is kept." : "Дополнительные рабочие блоки удаляются. Сохраняется первый блок каждого рабочего дня.",
 	"The approved absence is cancelled. The employee is notified." : "одобренное отсутствие отменяется. Сотрудник уведомлен.",
 	"The approved split decision can no longer be applied to the corrected times. Reload the entry and submit a new correction." : "одобренное раздельное решение больше не может применяться к скорректированному времени. Перезагрузите запись и отправьте новую коррекцию.",

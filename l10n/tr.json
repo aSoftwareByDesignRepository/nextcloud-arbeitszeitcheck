@@ -5264,6 +5264,7 @@
   "The absence stays approved. The employee is notified.": "Devamsızlık onaylı kalır. Çalışana bildirilir.",
   "The absence type could not be deleted. Please try again — if the problem persists, report the error.": "Devamsızlık türü silinemedi. Lütfen tekrar deneyin – sorun devam ederse hatayı bildirin.",
   "The absence type could not be saved. Please try again — if the problem persists, report the error.": "Devamsızlık türü kaydedilemedi. Lütfen tekrar deneyin – sorun devam ederse hatayı bildirin.",
+  "The active flag is required.": "The active flag is required.",
   "The additional working blocks are removed. The first block of each working day is kept.": "Ek çalışma blokları kaldırılır. Her çalışma gününün ilk bloğu korunur.",
   "The approved absence is cancelled. The employee is notified.": "Onaylı devamsızlık iptal edilir. Çalışana bildirilir.",
   "The approved split decision can no longer be applied to the corrected times. Reload the entry and submit a new correction.": "Onaylı bölme kararı düzeltilmiş saatlere artık uygulanamaz. Kaydı yeniden yükleyin ve yeni bir düzeltme gönderin.",

@@ -198,6 +198,12 @@ class HolidayRule extends Entity
 
 		if ($this->name === '' || $this->name === null) {
 			$errors['name'] = 'Name is required';
+		} elseif (mb_strlen($this->name) > 255) {
+			$errors['name'] = 'Name exceeds 255 characters';
+		}
+
+		if ($this->nameMsgid !== null && mb_strlen($this->nameMsgid) > 255) {
+			$errors['nameMsgid'] = 'Catalog name key exceeds 255 characters';
 		}
 
 		if (!in_array($this->kind, [Holiday::KIND_FULL, Holiday::KIND_HALF], true)) {

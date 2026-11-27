@@ -148,6 +148,8 @@ class Holiday extends Entity
 
 		if ($this->name === '' || $this->name === null) {
 			$errors['name'] = 'Name is required';
+		} elseif (mb_strlen($this->name) > 255) {
+			$errors['name'] = 'Name exceeds 255 characters';
 		}
 
 		if (!in_array($this->kind, [self::KIND_FULL, self::KIND_HALF], true)) {

@@ -232,6 +232,58 @@ describe('suggestions', () => {
 	})
 })
 
+describe('loadExistingHolidays merge order', () => {
+	it('renders skipped-only years instead of the empty row', async () => {
+		document.body.innerHTML = [
+			'<select id="holiday-state-select"><option value="NW" selected>NW</option></select>',
+			'<select id="holiday-year-select"><option value="2027" selected>2027</option></select>',
+			'<div id="holiday-results"></div>',
+			'<table><tbody id="holiday-tbody"></tbody></table>',
+		].join('')
+		fetchMock.mockResolvedValueOnce({
+			json: async () => ({
+				success: true,
+				holidays: [],
+				rules: [{
+					id: 7, name: 'Heiligabend', kind: 'full', scope: 'company',
+					rule_key: 'd:12-24', start_year: 2025, active: true,
+				}],
+				skipped_rules: [{
+					rule_id: 7, year: 2027, date: '2027-12-24',
+					name: 'Heiligabend', kind: 'full', scope: 'company',
+				}],
+			}),
+		})
+
+		t.loadExistingHolidays()
+		await vi.waitFor(() => {
+			expect(document.querySelector('#holiday-tbody tr')).toBeTruthy()
+		})
+
+		const row = document.querySelector('#holiday-tbody tr')
+		expect(row.classList.contains('admin-holidays-row--skipped')).toBe(true)
+		expect(row.querySelector('.admin-holidays-empty')).toBeNull()
+		expect(row.getAttribute('data-rule-id')).toBe('7')
+	})
+
+	it('still renders the empty row when nothing exists at all', async () => {
+		document.body.innerHTML = [
+			'<select id="holiday-state-select"><option value="NW" selected>NW</option></select>',
+			'<select id="holiday-year-select"><option value="2027" selected>2027</option></select>',
+			'<table><tbody id="holiday-tbody"></tbody></table>',
+		].join('')
+		fetchMock.mockResolvedValueOnce({
+			json: async () => ({ success: true, holidays: [], rules: [], skipped_rules: [] }),
+		})
+
+		t.loadExistingHolidays()
+		await vi.waitFor(() => {
+			expect(document.querySelector('#holiday-tbody tr')).toBeTruthy()
+		})
+		expect(document.querySelector('#holiday-tbody .admin-holidays-empty')).toBeTruthy()
+	})
+})
+
 describe('convert action', () => {
 	it('calls the atomic recurring endpoint after confirm', async () => {
 		window.AzcComponents = {

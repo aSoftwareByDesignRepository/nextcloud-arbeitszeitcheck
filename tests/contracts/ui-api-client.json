@@ -232,7 +232,8 @@
       "createPolicy",
       "ASSIGNMENT_OVERLAP",
       "REVISION_CONFLICT",
-      "previewPolicy"
+      "previewPolicy",
+      "paidLeave"
      ]
     },
     {
@@ -268,7 +269,8 @@
       "scopeType: scopeSel.value",
       "policyCreateUrl",
       "previewUrl",
-      "cohortMembershipTemplate"
+      "cohortMembershipTemplate",
+      "paidLeave"
      ]
     }
    ],

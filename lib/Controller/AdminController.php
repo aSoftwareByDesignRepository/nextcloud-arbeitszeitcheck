@@ -3227,7 +3227,22 @@ class AdminController extends Controller
 	{
 		try {
 			$performedBy = $this->getPerformedBy();
-			$rule = $this->holidayRuleService()->convertHolidayToRule($id, $performedBy);
+			$deletedRow = null;
+			$rule = $this->holidayRuleService()->convertHolidayToRule($id, $performedBy, $deletedRow);
+
+			// The row left at_holidays — log its deletion under the
+			// state_holiday entity so the audit trail stays complete.
+			if ($deletedRow !== null) {
+				$this->auditLogMapper->logAction(
+					$performedBy,
+					'state_holiday_deleted',
+					'state_holiday',
+					$id,
+					$this->holidayToAuditValues($deletedRow),
+					null,
+					$performedBy
+				);
+			}
 
 			$this->auditLogMapper->logAction(
 				$performedBy,
@@ -3304,14 +3319,10 @@ class AdminController extends Controller
 				$params = [];
 			}
 			$performedBy = $this->getPerformedBy();
+			// Old values are captured inside the service under the named
+			// lock — a pre-read here could race another admin writer.
 			$oldValues = null;
-			try {
-				$oldValues = $this->holidayRuleService()->getRuleForAudit($id);
-			} catch (\Throwable) {
-				$oldValues = null;
-			}
-
-			$rule = $this->holidayRuleService()->updateRule($id, $params, $performedBy);
+			$rule = $this->holidayRuleService()->updateRule($id, $params, $performedBy, $oldValues);
 
 			$this->auditLogMapper->logAction(
 				$performedBy,
@@ -3415,16 +3426,21 @@ class AdminController extends Controller
 	{
 		try {
 			$activeParam = $this->request->getParam('active', null);
+			// A missing/unknown value must NOT silently read as "stop the
+			// series" — require an explicit boolean-ish payload.
+			if ($activeParam === null || $activeParam === '') {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('The active flag is required.'),
+					'reason' => 'invalid_param',
+				], Http::STATUS_BAD_REQUEST);
+			}
 			$active = $activeParam === true || $activeParam === 1 || $activeParam === '1' || $activeParam === 'true';
 			$performedBy = $this->getPerformedBy();
+			// Old values are captured inside the service under the named
+			// lock — a pre-read here could race another admin writer.
 			$oldValues = null;
-			try {
-				$oldValues = $this->holidayRuleService()->getRuleForAudit($id);
-			} catch (\Throwable) {
-				$oldValues = null;
-			}
-
-			$rule = $this->holidayRuleService()->setActive($id, $active, $performedBy);
+			$rule = $this->holidayRuleService()->setActive($id, $active, $performedBy, $oldValues);
 
 			$this->auditLogMapper->logAction(
 				$performedBy,

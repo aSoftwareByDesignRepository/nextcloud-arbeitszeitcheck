@@ -253,55 +253,62 @@ final class SpecialEntitlementAdminService
 			DbLockGuard::acquire($this->lockingProvider, $lock, ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement type');
 		}
 		try {
-			$type = $this->requireType($typeId);
-			$this->assertRevision($params, (int)$type->getVersion());
-			$old = $this->auditTypeSummary($type);
-			if (array_key_exists('publicLabel', $params) || array_key_exists('public_label', $params)) {
-				$type->setPublicLabel($this->requiredLabel($params['publicLabel'] ?? $params['public_label'], 'publicLabel'));
-			}
-			if (array_key_exists('confidentialLabel', $params) || array_key_exists('confidential_label', $params)) {
-				$type->setConfidentialLabel($this->optionalLabel($params['confidentialLabel'] ?? $params['confidential_label'], 'confidentialLabel'));
-			}
-			if (array_key_exists('labelI18n', $params) || array_key_exists('label_i18n', $params)) {
-				$map = $this->labelMap($params['labelI18n'] ?? $params['label_i18n']);
-				$type->setLabelI18n($map !== [] ? json_encode($map, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null);
-			}
-			if (!$type->getActive()) {
-				if (array_key_exists('unit', $params)) {
-					$type->setUnit($this->enumString($params['unit'], SpecialEntitlementType::UNITS, 'unit'));
+			$this->db->beginTransaction();
+			try {
+				$type = $this->requireType($typeId);
+				$this->assertRevision($params, (int)$type->getVersion());
+				$old = $this->auditTypeSummary($type);
+				if (array_key_exists('publicLabel', $params) || array_key_exists('public_label', $params)) {
+					$type->setPublicLabel($this->requiredLabel($params['publicLabel'] ?? $params['public_label'], 'publicLabel'));
 				}
-				if (array_key_exists('periodType', $params) || array_key_exists('period_type', $params)) {
-					$type->setPeriodType($this->enumString($params['periodType'] ?? $params['period_type'], SpecialEntitlementType::PERIODS, 'periodType'));
+				if (array_key_exists('confidentialLabel', $params) || array_key_exists('confidential_label', $params)) {
+					$type->setConfidentialLabel($this->optionalLabel($params['confidentialLabel'] ?? $params['confidential_label'], 'confidentialLabel'));
 				}
-				if (array_key_exists('absenceTypeCode', $params) || array_key_exists('absence_type_code', $params)) {
-					$code = $this->nullableString($params['absenceTypeCode'] ?? $params['absence_type_code'], 'absenceTypeCode', 64);
-					if ($code === null) {
-						throw new SpecialEntitlementException('VALIDATION_ERROR', 'An absence type is required.', 400, ['absenceTypeCode' => 'required']);
+				if (array_key_exists('labelI18n', $params) || array_key_exists('label_i18n', $params)) {
+					$map = $this->labelMap($params['labelI18n'] ?? $params['label_i18n']);
+					$type->setLabelI18n($map !== [] ? json_encode($map, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null);
+				}
+				if (!$type->getActive()) {
+					if (array_key_exists('unit', $params)) {
+						$type->setUnit($this->enumString($params['unit'], SpecialEntitlementType::UNITS, 'unit'));
 					}
-					$this->assertCreatableAbsenceType($code);
-					$linked = $this->types->findByAbsenceTypeCode($code);
-					if ($linked !== null && (int)$linked->getId() !== $typeId) {
-						throw new SpecialEntitlementException('VALIDATION_ERROR', 'This absence type is already linked to an entitlement.', 400, ['absenceTypeCode' => 'linked']);
+					if (array_key_exists('periodType', $params) || array_key_exists('period_type', $params)) {
+						$type->setPeriodType($this->enumString($params['periodType'] ?? $params['period_type'], SpecialEntitlementType::PERIODS, 'periodType'));
 					}
-					$type->setAbsenceTypeCode($code);
+					if (array_key_exists('absenceTypeCode', $params) || array_key_exists('absence_type_code', $params)) {
+						$code = $this->nullableString($params['absenceTypeCode'] ?? $params['absence_type_code'], 'absenceTypeCode', 64);
+						if ($code === null) {
+							throw new SpecialEntitlementException('VALIDATION_ERROR', 'An absence type is required.', 400, ['absenceTypeCode' => 'required']);
+						}
+						$this->assertCreatableAbsenceType($code);
+						$linked = $this->types->findByAbsenceTypeCode($code);
+						if ($linked !== null && (int)$linked->getId() !== $typeId) {
+							throw new SpecialEntitlementException('VALIDATION_ERROR', 'This absence type is already linked to an entitlement.', 400, ['absenceTypeCode' => 'linked']);
+						}
+						$type->setAbsenceTypeCode($code);
+					}
 				}
+				if (array_key_exists('allowNegative', $params) || array_key_exists('allow_negative', $params)) {
+					$type->setAllowNegative($this->parseBool($params['allowNegative'] ?? $params['allow_negative']));
+				}
+				if (array_key_exists('employeeMaySeeConfidentialLabel', $params) || array_key_exists('employee_may_see_confidential_label', $params)) {
+					$type->setEmployeeMaySeeConfidentialLabel($this->parseBool($params['employeeMaySeeConfidentialLabel'] ?? $params['employee_may_see_confidential_label']));
+				}
+				if ($paidLeaveParam) {
+					$rawPaidLeave = $params['paidLeave'] ?? $params['paid_leave'] ?? $params['sollCredit'] ?? $params['soll_credit'];
+					$this->applyPaidLeaveToLinkedType((string)$type->getAbsenceTypeCode(), $this->parseBool($rawPaidLeave), $actorUid);
+					AbsenceTypeCatalog::resetCustomTypeCache();
+				}
+				$type->setVersion((int)$type->getVersion() + 1);
+				$type->setUpdatedBy($actorUid);
+				$type->setUpdatedAt(new \DateTime());
+				$type = $this->types->update($type);
+				$this->audit->logAction($actorUid, 'special_entitlement_type_updated', 'special_entitlement_type', $typeId, $old, $this->auditTypeSummary($type), $actorUid);
+				$this->db->commit();
+			} catch (\Throwable $e) {
+				$this->db->rollBack();
+				throw $e;
 			}
-			if (array_key_exists('allowNegative', $params) || array_key_exists('allow_negative', $params)) {
-				$type->setAllowNegative($this->parseBool($params['allowNegative'] ?? $params['allow_negative']));
-			}
-			if (array_key_exists('employeeMaySeeConfidentialLabel', $params) || array_key_exists('employee_may_see_confidential_label', $params)) {
-				$type->setEmployeeMaySeeConfidentialLabel($this->parseBool($params['employeeMaySeeConfidentialLabel'] ?? $params['employee_may_see_confidential_label']));
-			}
-			if ($paidLeaveParam) {
-				$rawPaidLeave = $params['paidLeave'] ?? $params['paid_leave'] ?? $params['sollCredit'] ?? $params['soll_credit'];
-				$this->applyPaidLeaveToLinkedType((string)$type->getAbsenceTypeCode(), $this->parseBool($rawPaidLeave), $actorUid);
-				AbsenceTypeCatalog::resetCustomTypeCache();
-			}
-			$type->setVersion((int)$type->getVersion() + 1);
-			$type->setUpdatedBy($actorUid);
-			$type->setUpdatedAt(new \DateTime());
-			$type = $this->types->update($type);
-			$this->audit->logAction($actorUid, 'special_entitlement_type_updated', 'special_entitlement_type', $typeId, $old, $this->auditTypeSummary($type), $actorUid);
 			return $this->adminTypeSummary($type);
 		} finally {
 			foreach (array_reverse($locks) as $lock) {
@@ -1277,7 +1284,9 @@ final class SpecialEntitlementAdminService
 			return;
 		}
 		if ((bool)$custom->getSollCredit() === $paidLeave) {
-			$this->sollCreditByCode[$absenceTypeCode] = $paidLeave;
+			if ($this->sollCreditByCode !== null) {
+				$this->sollCreditByCode[$absenceTypeCode] = $paidLeave;
+			}
 			return;
 		}
 		$oldSummary = $custom->getSummary();
@@ -1286,7 +1295,9 @@ final class SpecialEntitlementAdminService
 		$custom->setUpdatedAt(new \DateTime());
 		$this->customAbsenceTypes->update($custom);
 		$this->audit->logAction($actorUid, CustomAbsenceTypeService::ACTION_UPDATED, CustomAbsenceTypeService::ENTITY_TYPE, (int)$custom->getId(), $oldSummary, $custom->getSummary(), $actorUid);
-		$this->sollCreditByCode[$absenceTypeCode] = $paidLeave;
+		if ($this->sollCreditByCode !== null) {
+			$this->sollCreditByCode[$absenceTypeCode] = $paidLeave;
+		}
 	}
 
 	/**

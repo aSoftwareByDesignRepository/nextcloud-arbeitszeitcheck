@@ -890,13 +890,9 @@
                 holidaysPageConfig.statutoryAutoReseed = data.statutoryAutoReseed !== false;
             }
 
-            if (data.holidays.length === 0) {
-                renderEmptyHolidaysRow(tbody);
-                return;
-            }
-
             // B-R7: recurring-rule context for badges/actions and muted
-            // skipped instances. Rendered merged with rows, sorted by date.
+            // skipped instances — stored and merged BEFORE the empty check:
+            // a year holding only skipped instances must still render them.
             holidayRules = Array.isArray(data.rules) ? data.rules : [];
             skippedRules = Array.isArray(data.skipped_rules) ? data.skipped_rules : [];
 
@@ -916,6 +912,11 @@
             merged.sort(function(a, b) {
                 return String(a.date || '').localeCompare(String(b.date || ''));
             });
+
+            if (merged.length === 0) {
+                renderEmptyHolidaysRow(tbody);
+                return;
+            }
 
             merged.forEach(function(item) {
                 appendExistingHolidayRow(tbody, item);
@@ -1850,6 +1851,7 @@
             setRuleActive: setRuleActive,
             saveRuleChanges: saveRuleChanges,
             findRuleById: findRuleById,
+            loadExistingHolidays: loadExistingHolidays,
             setPersistedCountry: function(country) {
                 persistedCountry = String(country || 'DE').toUpperCase();
             },

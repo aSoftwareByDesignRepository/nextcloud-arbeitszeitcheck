@@ -25,6 +25,8 @@ class HolidayAdminService
 	public function __construct(
 		private readonly HolidayMapper $holidayMapper,
 		private readonly HolidaySuppressionMapper $suppressionMapper,
+		private readonly \OCA\ArbeitszeitCheck\Db\HolidayRuleMapper $holidayRuleMapper,
+		private readonly \OCA\ArbeitszeitCheck\Db\HolidayRuleSkipMapper $holidayRuleSkipMapper,
 		private readonly HolidayService $holidayCalendarService,
 		private readonly IConfig $config,
 		private readonly ?ILockingProvider $lockingProvider = null,
@@ -159,6 +161,27 @@ class HolidayAdminService
 			}
 		}
 
+		// B-R10: active rules and this year's skips — the support audit
+		// explains rule-sourced days that are absent from at_holidays rows.
+		$ruleRows = $this->holidayRuleMapper->findByState($state);
+		$ruleIds = array_map(static fn ($r): int => (int)$r->getId(), $ruleRows);
+		$skippedByRule = $this->holidayRuleSkipMapper->yearsForRuleIds($ruleIds);
+		$rules = [];
+		foreach ($ruleRows as $rule) {
+			$resolved = $rule->resolveDateForYear($year);
+			$rules[] = [
+				'id' => (int)$rule->getId(),
+				'name' => (string)$rule->getName(),
+				'rule_key' => (string)$rule->getRuleKey(),
+				'scope' => (string)$rule->getScope(),
+				'kind' => (string)$rule->getKind(),
+				'active' => (bool)$rule->getActive(),
+				'start_year' => (int)$rule->getStartYear(),
+				'resolved_date' => $resolved !== null ? $resolved->format('Y-m-d') : null,
+				'skipped_years' => $skippedByRule[(int)$rule->getId()] ?? [],
+			];
+		}
+
 		return [
 			'state' => $state,
 			'year' => $year,
@@ -168,6 +191,7 @@ class HolidayAdminService
 			'suppressedDates' => $suppressed,
 			'missingInDb' => $missingInDb,
 			'extraInDb' => $extraInDb,
+			'rules' => $rules,
 			'ok' => $missingInDb === [] && $extraInDb === [],
 		];
 	}

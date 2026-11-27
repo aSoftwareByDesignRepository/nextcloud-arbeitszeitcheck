@@ -32,6 +32,17 @@
         }
     }
 
+    function showUserInfo(message) {
+        if (Messaging && typeof Messaging.showInfo === 'function') {
+            Messaging.showInfo(message);
+            return;
+        }
+        const region = document.getElementById('azc-live-region');
+        if (region) {
+            region.textContent = String(message);
+        }
+    }
+
     const HOLIDAYS_UI_JSON_ID = 'arbeitszeitcheck-admin-holidays-ui-strings';
     const HOLIDAYS_CONFIG_JSON_ID = 'arbeitszeitcheck-admin-holidays-config';
 
@@ -166,6 +177,22 @@
     let regionDataCache = null;
     let persistedCountry = 'DE';
     let savingCountryRegion = false;
+    // Recurring-rule state for the currently loaded state+year (B-R7):
+    // rules[] powers badges/actions, skippedRules[] renders muted rows.
+    let holidayRules = [];
+    let skippedRules = [];
+
+    /** Curated movable days (B-R4) — mirrors HolidayRule::ALLOWED_EASTER_OFFSETS. */
+    const EASTER_DAY_OPTIONS = [
+        { offset: -48, labelKey: 'Rose Monday' },
+        { offset: -47, labelKey: 'Shrove Tuesday' },
+        { offset: -46, labelKey: 'Ash Wednesday' },
+        { offset: -2, labelKey: 'Good Friday' },
+        { offset: 1, labelKey: 'Easter Monday' },
+        { offset: 39, labelKey: 'Ascension Day' },
+        { offset: 50, labelKey: 'Whit Monday' },
+        { offset: 60, labelKey: 'Corpus Christi' },
+    ];
 
     function init() {
         if (initialized) {
@@ -636,6 +663,9 @@
         deleteBtn.title = tAzc('Remove');
         deleteBtn.innerHTML = (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('trash') : '';
         Utils.on(deleteBtn, 'click', function() {
+            if (row.__extrasRow) {
+                row.__extrasRow.remove();
+            }
             row.remove();
         });
 
@@ -654,12 +684,78 @@
 
         tbody.appendChild(row);
 
+        // B-R7: "Repeat every year" — checkbox + anchor choice in a second
+        // editor row (fixed date vs one of the curated movable days).
+        const extrasRow = buildRepeatExtrasRow(row);
+        tbody.appendChild(extrasRow);
+
         // Initialize datepicker with German dd.mm.yyyy format
         if (window.ArbeitszeitCheckDatepicker && window.ArbeitszeitCheckDatepicker.initializeDatepicker) {
             window.ArbeitszeitCheckDatepicker.initializeDatepicker(dateInput, {});
         }
 
         dateInput.focus();
+    }
+
+    /**
+     * The second editor row of the add form: "Repeat every year" checkbox
+     * plus an anchor select — "On the date above" or a named movable day
+     * (easter offset). Removing the editor row must remove this row too.
+     */
+    function buildRepeatExtrasRow(editorRow) {
+        const extrasRow = document.createElement('tr');
+        extrasRow.className = 'admin-holidays__editor-extras';
+        const cell = document.createElement('td');
+        cell.colSpan = 5;
+        cell.setAttribute('data-label', tAzc('Repeat every year'));
+
+        const wrap = document.createElement('div');
+        wrap.className = 'admin-holidays__repeat-controls';
+
+        const cbWrap = document.createElement('span');
+        cbWrap.className = 'form-checkbox';
+        const repeatCb = document.createElement('input');
+        repeatCb.type = 'checkbox';
+        repeatCb.name = 'recurring';
+        repeatCb.id = 'holiday-new-recurring';
+        const repeatLabel = document.createElement('label');
+        repeatLabel.className = 'form-label';
+        repeatLabel.setAttribute('for', 'holiday-new-recurring');
+        repeatLabel.textContent = tAzc('Repeat every year');
+        cbWrap.appendChild(repeatCb);
+        cbWrap.appendChild(repeatLabel);
+        wrap.appendChild(cbWrap);
+
+        const anchorSelect = document.createElement('select');
+        anchorSelect.name = 'anchor';
+        anchorSelect.className = 'form-select';
+        anchorSelect.setAttribute('aria-label', tAzc('Repeat every year'));
+        anchorSelect.disabled = true;
+        const optDate = document.createElement('option');
+        optDate.value = 'date';
+        optDate.textContent = tAzc('On the date above');
+        anchorSelect.appendChild(optDate);
+        EASTER_DAY_OPTIONS.forEach(function(opt) {
+            const o = document.createElement('option');
+            o.value = 'easter:' + opt.offset;
+            o.textContent = tAzc(opt.labelKey);
+            anchorSelect.appendChild(o);
+        });
+        wrap.appendChild(anchorSelect);
+
+        repeatCb.addEventListener('change', function() {
+            anchorSelect.disabled = !repeatCb.checked;
+            if (!repeatCb.checked) {
+                anchorSelect.value = 'date';
+            }
+        });
+
+        cell.appendChild(wrap);
+        extrasRow.appendChild(cell);
+
+        // Keep the extras row glued to the editor row it belongs to.
+        editorRow.__extrasRow = extrasRow;
+        return extrasRow;
     }
 
     function saveHolidayRow(row) {
@@ -693,6 +789,21 @@
             return;
         }
 
+        // B-R7: repeat checkbox + anchor select live in the extras row.
+        const extras = row.__extrasRow;
+        const recurringCb = extras ? extras.querySelector('input[name="recurring"]') : null;
+        const anchorSelect = extras ? extras.querySelector('select[name="anchor"]') : null;
+        if (recurringCb && recurringCb.checked && anchorSelect) {
+            payload.recurring = true;
+            const anchorValue = anchorSelect.value || 'date';
+            if (anchorValue.indexOf('easter:') === 0) {
+                payload.anchor = 'easter';
+                payload.easterOffset = parseInt(anchorValue.substring('easter:'.length), 10);
+            } else {
+                payload.anchor = 'date';
+            }
+        }
+
         const url = OC.generateUrl('/apps/arbeitszeitcheck/api/admin/state-holidays');
         fetch(url, {
             method: 'POST',
@@ -710,7 +821,18 @@
                     tbodyEl.innerHTML = '';
                 }
                 loadExistingHolidays();
-                showUserSuccess(tAzc('Holiday was saved.'));
+                if (data.rule) {
+                    showUserSuccess(tAzc('Annual rule "{name}" was created.')
+                        .replace('{name}', data.rule.name || payload.name || ''));
+                } else if (data.covered_by_rule && data.covered_by_rule.name) {
+                    showUserSuccess(tAzc('Holiday was saved.'));
+                    // Shadow hint (B-R7/EC-B11): an annual rule already produces
+                    // a day on this date — the persisted row wins for this year.
+                    showUserInfo(tAzc('This date is already covered by the annual rule "{name}" — your entry replaces the rule instance for this year.')
+                        .replace('{name}', data.covered_by_rule.name));
+                } else {
+                    showUserSuccess(tAzc('Holiday was saved.'));
+                }
             } else {
                 const errorMsg = (data && data.error) || tAzc('Holiday could not be saved.');
                 showUserError(errorMsg);
@@ -773,7 +895,29 @@
                 return;
             }
 
-            data.holidays.forEach(function(item) {
+            // B-R7: recurring-rule context for badges/actions and muted
+            // skipped instances. Rendered merged with rows, sorted by date.
+            holidayRules = Array.isArray(data.rules) ? data.rules : [];
+            skippedRules = Array.isArray(data.skipped_rules) ? data.skipped_rules : [];
+
+            const merged = data.holidays.slice();
+            skippedRules.forEach(function(skip) {
+                merged.push({
+                    id: null,
+                    rule_id: skip.rule_id,
+                    date: skip.date,
+                    name: skip.name,
+                    kind: skip.kind,
+                    scope: skip.scope,
+                    recurring: true,
+                    skipped: true,
+                });
+            });
+            merged.sort(function(a, b) {
+                return String(a.date || '').localeCompare(String(b.date || ''));
+            });
+
+            merged.forEach(function(item) {
                 appendExistingHolidayRow(tbody, item);
             });
         }).catch(function() {
@@ -860,6 +1004,26 @@
             badge.className = 'admin-holidays-badge admin-holidays-badge--company';
             badge.textContent = tAzc('Already in the calendar');
             item.appendChild(badge);
+            // A persisted row only covers this year — an annual rule may still
+            // be added (it applies to all years; the row wins this year).
+            if (suggestion.recurring_exists) {
+                const annualBadge = document.createElement('span');
+                annualBadge.className = 'admin-holidays-badge admin-holidays-badge--rule';
+                annualBadge.textContent = '↻ ' + tAzc('Already annual');
+                item.appendChild(annualBadge);
+            } else {
+                const annualBtn = document.createElement('button');
+                annualBtn.type = 'button';
+                annualBtn.className = 'azc-btn azc-btn--secondary azc-btn--sm';
+                annualBtn.textContent = tAzc('Add annually');
+                annualBtn.setAttribute('aria-label', tAzc('Add {name} ({date}) every year')
+                    .replace('{name}', suggestion.name || '')
+                    .replace('{date}', displayDate));
+                Utils.on(annualBtn, 'click', function() {
+                    addSuggestionAnnually(suggestion, state, annualBtn);
+                });
+                item.appendChild(annualBtn);
+            }
             return item;
         }
 
@@ -909,7 +1073,86 @@
         });
         item.appendChild(addBtn);
 
+        // B-R7: "Add annually" creates the recurring rule for this catalog
+        // entry (anchor + name_msgid come from the suggestion payload). The
+        // button stays disabled when a matching rule already exists.
+        if (suggestion.recurring_exists) {
+            const annualBadge = document.createElement('span');
+            annualBadge.className = 'admin-holidays-badge admin-holidays-badge--rule';
+            annualBadge.textContent = '↻ ' + tAzc('Already annual');
+            item.appendChild(annualBadge);
+        } else {
+            const annualBtn = document.createElement('button');
+            annualBtn.type = 'button';
+            annualBtn.className = 'azc-btn azc-btn--secondary azc-btn--sm';
+            annualBtn.textContent = tAzc('Add annually');
+            annualBtn.setAttribute('aria-label', tAzc('Add {name} ({date}) every year')
+                .replace('{name}', suggestion.name || '')
+                .replace('{date}', displayDate));
+            Utils.on(annualBtn, 'click', function() {
+                addSuggestionAnnually(suggestion, state, annualBtn);
+            });
+            item.appendChild(annualBtn);
+        }
+
         return item;
+    }
+
+    /** B-R7: one-click recurring rule from a catalog suggestion. */
+    function addSuggestionAnnually(suggestion, state, annualBtn) {
+        annualBtn.disabled = true;
+        annualBtn.setAttribute('aria-busy', 'true');
+
+        const payload = {
+            state: state,
+            name: suggestion.name,
+            kind: (suggestion.kind === 'half') ? 'half' : 'full',
+            scope: 'company',
+            recurring: true
+        };
+        if (suggestion.name_msgid) {
+            payload.nameMsgid = suggestion.name_msgid;
+        }
+        // Anchor metadata is structured: {type:'date'|'easter', offset, month,
+        // day} — forwarded verbatim, never inferred from date equality (B-R4).
+        const anchor = suggestion.anchor && typeof suggestion.anchor === 'object'
+            ? suggestion.anchor
+            : { type: 'date' };
+        if (anchor.type === 'easter') {
+            payload.anchor = 'easter';
+            payload.easterOffset = parseInt(anchor.offset, 10);
+        } else {
+            payload.anchor = 'date';
+            // The service derives month/day (and the start-year default) from
+            // the full ISO date of the suggestion.
+            payload.date = suggestion.date;
+        }
+
+        const url = ruleApiBase();
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'requesttoken': OC.requestToken
+            },
+            body: JSON.stringify(payload)
+        }).then(function(response) {
+            return response.json();
+        }).then(function(data) {
+            annualBtn.disabled = false;
+            annualBtn.removeAttribute('aria-busy');
+            if (data && data.success) {
+                showUserSuccess(tAzc('Annual rule "{name}" was created.')
+                    .replace('{name}', suggestion.name || ''));
+                loadExistingHolidays();
+            } else {
+                showUserError((data && data.error) || tAzc('Rule could not be saved.'));
+            }
+        }).catch(function() {
+            annualBtn.disabled = false;
+            annualBtn.removeAttribute('aria-busy');
+            showUserError(tAzc('Rule could not be saved.'));
+        });
     }
 
     function appendExistingHolidayRow(tbody, item) {
@@ -962,7 +1205,46 @@
         const actionsCell = document.createElement('td');
         actionsCell.className = 'actions-cell';
         actionsCell.setAttribute('data-label', tAzc('Actions'));
-        {
+        const actionsWrap = document.createElement('div');
+        actionsWrap.className = 'azc-table-actions admin-holidays__row-actions';
+        actionsWrap.setAttribute('role', 'group');
+
+        if (item.recurring === true && item.skipped !== true) {
+            // EC-B13: synthesized rule instance — badge marks it, actions
+            // operate on the RULE (skip year / stop series), never on a row id.
+            const annualBadge = document.createElement('span');
+            annualBadge.className = 'admin-holidays-badge admin-holidays-badge--rule';
+            annualBadge.textContent = '↻ ' + tAzc('annual');
+            nameCell.appendChild(document.createTextNode(' '));
+            nameCell.appendChild(annualBadge);
+            row.setAttribute('data-rule-id', String(item.rule_id || ''));
+            row.classList.add('admin-holidays-row--rule');
+            buildRuleInstanceActions(actionsWrap, item, displayDate);
+        } else if (item.recurring === true && item.skipped === true) {
+            // Skipped instance (B-R7): muted row + restore action.
+            const annualBadge = document.createElement('span');
+            annualBadge.className = 'admin-holidays-badge admin-holidays-badge--rule';
+            annualBadge.textContent = '↻ ' + tAzc('annual');
+            nameCell.appendChild(document.createTextNode(' '));
+            nameCell.appendChild(annualBadge);
+            const skippedBadge = document.createElement('span');
+            skippedBadge.className = 'admin-holidays-badge admin-holidays-badge--skipped';
+            skippedBadge.textContent = tAzc('Skipped in {year} (annual rule)')
+                .replace('{year}', String(getSelectedYear()));
+            nameCell.appendChild(document.createTextNode(' '));
+            nameCell.appendChild(skippedBadge);
+            row.setAttribute('data-rule-id', String(item.rule_id || ''));
+            row.classList.add('admin-holidays-row--skipped');
+            const restoreBtn = document.createElement('button');
+            restoreBtn.type = 'button';
+            restoreBtn.className = 'azc-btn azc-btn--secondary azc-btn--sm';
+            restoreBtn.textContent = tAzc('Restore');
+            restoreBtn.setAttribute('aria-label', tAzc('Restore') + ' ' + (item.name || ''));
+            Utils.on(restoreBtn, 'click', function() {
+                restoreSkippedInstance(item);
+            });
+            actionsWrap.appendChild(restoreBtn);
+        } else {
             const deleteBtn = document.createElement('button');
             deleteBtn.type = 'button';
             deleteBtn.className = 'azc-btn azc-btn--danger azc-icon-btn';
@@ -976,12 +1258,24 @@
             Utils.on(deleteBtn, 'click', function() {
                 confirmRemoveHoliday(item, row, displayDate);
             });
-            const actionsWrap = document.createElement('div');
-            actionsWrap.className = 'azc-table-actions admin-holidays__row-actions';
-            actionsWrap.setAttribute('role', 'group');
             actionsWrap.appendChild(deleteBtn);
-            actionsCell.appendChild(actionsWrap);
+
+            // Convert action (B-R7): persisted custom/company rows can become
+            // an annual rule — the rule replaces the row for all years.
+            if (item.scope === 'custom' || item.scope === 'company') {
+                const convertBtn = document.createElement('button');
+                convertBtn.type = 'button';
+                convertBtn.className = 'azc-btn azc-btn--secondary azc-icon-btn';
+                convertBtn.innerHTML = '↻';
+                convertBtn.setAttribute('aria-label', tAzc('Make annual'));
+                convertBtn.title = tAzc('Make annual');
+                Utils.on(convertBtn, 'click', function() {
+                    convertRowToRule(item, row);
+                });
+                actionsWrap.appendChild(convertBtn);
+            }
         }
+        actionsCell.appendChild(actionsWrap);
 
         row.appendChild(dateCell);
         row.appendChild(nameCell);
@@ -1003,6 +1297,427 @@
         cell.textContent = tAzc('No holidays configured for this year.');
         row.appendChild(cell);
         tbody.appendChild(row);
+    }
+
+    // ---------- Recurring-rule actions (B-R7) ----------
+
+    function ruleApiBase() {
+        return OC.generateUrl('/apps/arbeitszeitcheck/api/admin/holiday-rules');
+    }
+
+    function findRuleById(ruleId) {
+        const id = parseInt(ruleId, 10);
+        for (let i = 0; i < holidayRules.length; i++) {
+            if (parseInt(holidayRules[i].id, 10) === id) {
+                return holidayRules[i];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Actions for a synthesized rule instance row: edit rule (name/kind/
+     * start_year — applies to all years) plus a remove action that opens the
+     * year-vs-series choice dialog.
+     */
+    function buildRuleInstanceActions(actionsWrap, item, displayDate) {
+        const ruleId = item.rule_id;
+
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'azc-btn azc-btn--secondary azc-icon-btn';
+        editBtn.innerHTML = (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('edit') : '✎';
+        editBtn.setAttribute('aria-label', tAzc('Edit rule'));
+        editBtn.title = tAzc('Edit rule');
+        Utils.on(editBtn, 'click', function() {
+            openRuleEditDialog(ruleId);
+        });
+        actionsWrap.appendChild(editBtn);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'azc-btn azc-btn--danger azc-icon-btn';
+        removeBtn.innerHTML = (window.AzcCatalog && window.AzcCatalog.render) ? window.AzcCatalog.render('trash') : '';
+        removeBtn.setAttribute('aria-label', tAzc('Remove "{name}"').replace('{name}', item.name || ''));
+        removeBtn.title = tAzc('Remove "{name}"').replace('{name}', item.name || '');
+        Utils.on(removeBtn, 'click', function() {
+            openRuleRemoveChoiceDialog(ruleId, item.name || '', getSelectedYear());
+        });
+        actionsWrap.appendChild(removeBtn);
+    }
+
+    /**
+     * Native <dialog> (design-system recipe, NN-04): delete on a rule instance
+     * offers "only this year" (skip) vs "every year" (stop series).
+     * @param {number|string} ruleId
+     * @param {string} name
+     * @param {number} year
+     */
+    function openRuleRemoveChoiceDialog(ruleId, name, year) {
+        const dialog = document.createElement('dialog');
+        dialog.className = 'azc-dialog';
+
+        const form = document.createElement('form');
+        form.method = 'dialog';
+        form.setAttribute('novalidate', '');
+
+        const title = document.createElement('h2');
+        title.className = 'azc-dialog__title';
+        title.textContent = tAzc('Remove "{name}"').replace('{name}', name);
+        form.appendChild(title);
+
+        const message = document.createElement('p');
+        message.className = 'form-help';
+        message.textContent = tAzc('Skip only the {year} instance, or stop the rule so it produces no day in any year.')
+            .replace('{year}', String(year));
+        form.appendChild(message);
+
+        const footer = document.createElement('div');
+        footer.className = 'azc-dialog__actions';
+
+        const skipBtn = document.createElement('button');
+        skipBtn.type = 'button';
+        skipBtn.className = 'azc-btn azc-btn--secondary';
+        skipBtn.textContent = tAzc('Only {year}').replace('{year}', String(year));
+        Utils.on(skipBtn, 'click', function() {
+            dialog.close();
+            dialog.remove();
+            skipRuleYear(ruleId, year);
+        });
+        footer.appendChild(skipBtn);
+
+        const stopBtn = document.createElement('button');
+        stopBtn.type = 'button';
+        stopBtn.className = 'azc-btn azc-btn--danger';
+        stopBtn.textContent = tAzc('Every year (stop the rule)');
+        Utils.on(stopBtn, 'click', function() {
+            dialog.close();
+            dialog.remove();
+            setRuleActive(ruleId, false);
+        });
+        footer.appendChild(stopBtn);
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'azc-btn azc-btn--secondary';
+        cancelBtn.textContent = tAzc('Cancel');
+        Utils.on(cancelBtn, 'click', function() {
+            dialog.close();
+            dialog.remove();
+        });
+        footer.appendChild(cancelBtn);
+
+        form.appendChild(footer);
+        dialog.appendChild(form);
+        document.body.appendChild(dialog);
+
+        dialog.addEventListener('close', function() {
+            if (dialog.parentNode) {
+                dialog.remove();
+            }
+        });
+        dialog.showModal();
+    }
+
+    /** POST …/holiday-rules/{id}/skips — hide the rule instance for one year. */
+    function skipRuleYear(ruleId, year) {
+        const url = ruleApiBase() + '/' + encodeURIComponent(String(ruleId)) + '/skips';
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'requesttoken': OC.requestToken
+            },
+            body: JSON.stringify({ year: year })
+        }).then(function(response) {
+            return response.json();
+        }).then(function(data) {
+            if (data && data.success) {
+                showUserSuccess(tAzc('Holiday was removed.'));
+                loadExistingHolidays();
+            } else {
+                showUserError((data && data.error) || tAzc('Holiday could not be removed.'));
+            }
+        }).catch(function() {
+            showUserError(tAzc('An error occurred while removing the holiday.'));
+        });
+    }
+
+    /** DELETE …/skips/{year} — undo a skipped instance. */
+    function restoreSkippedInstance(item) {
+        const year = getSelectedYear();
+        const url = ruleApiBase() + '/' + encodeURIComponent(String(item.rule_id)) +
+            '/skips/' + encodeURIComponent(String(year));
+        fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'requesttoken': OC.requestToken
+            },
+            body: JSON.stringify({})
+        }).then(function(response) {
+            return response.json();
+        }).then(function(data) {
+            if (data && data.success) {
+                showUserSuccess(tAzc('Holiday was saved.'));
+                loadExistingHolidays();
+            } else {
+                showUserError((data && data.error) || tAzc('Holiday could not be saved.'));
+            }
+        }).catch(function() {
+            showUserError(tAzc('An error occurred while saving the holiday.'));
+        });
+    }
+
+    /** POST …/holiday-rules/{id}/active — stop (or restart) the whole series. */
+    function setRuleActive(ruleId, active) {
+        const url = ruleApiBase() + '/' + encodeURIComponent(String(ruleId)) + '/active';
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'requesttoken': OC.requestToken
+            },
+            body: JSON.stringify({ active: active ? 1 : 0 })
+        }).then(function(response) {
+            return response.json();
+        }).then(function(data) {
+            if (data && data.success) {
+                showUserSuccess(tAzc('Rule was saved.'));
+                loadExistingHolidays();
+            } else {
+                showUserError((data && data.error) || tAzc('Rule could not be saved.'));
+            }
+        }).catch(function() {
+            showUserError(tAzc('Rule could not be saved.'));
+        });
+    }
+
+    /**
+     * PUT …/holiday-rules/{id} — name/kind/start_year edits apply to every
+     * year the rule produces. Rendered as a native <dialog>.
+     */
+    function openRuleEditDialog(ruleId) {
+        const rule = findRuleById(ruleId);
+        if (!rule) {
+            showUserError(tAzc('Rule could not be saved.'));
+            return;
+        }
+
+        const dialog = document.createElement('dialog');
+        dialog.className = 'azc-dialog';
+
+        const form = document.createElement('form');
+        form.method = 'dialog';
+        form.setAttribute('novalidate', '');
+
+        const title = document.createElement('h2');
+        title.className = 'azc-dialog__title';
+        title.textContent = tAzc('Edit rule');
+        form.appendChild(title);
+
+        const hint = document.createElement('p');
+        hint.className = 'form-help';
+        hint.textContent = tAzc('Editing annual rule — changes apply to every year the rule produces.') +
+            ' ' + tAzc('Changes apply to all years. For an exception, skip the year and create a single entry instead.');
+        form.appendChild(hint);
+
+        const nameField = document.createElement('div');
+        nameField.className = 'form-group';
+        const nameLabel = document.createElement('label');
+        nameLabel.className = 'form-label';
+        nameLabel.setAttribute('for', 'azc-rule-edit-name');
+        nameLabel.textContent = tAzc('Holiday name');
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.id = 'azc-rule-edit-name';
+        nameInput.className = 'form-input';
+        nameInput.required = true;
+        nameInput.value = rule.name || '';
+        nameField.appendChild(nameLabel);
+        nameField.appendChild(nameInput);
+        form.appendChild(nameField);
+
+        const kindField = document.createElement('div');
+        kindField.className = 'form-group';
+        const kindLabel = document.createElement('label');
+        kindLabel.className = 'form-label';
+        kindLabel.setAttribute('for', 'azc-rule-edit-kind');
+        kindLabel.textContent = tAzc('Type');
+        const kindSelect = document.createElement('select');
+        kindSelect.id = 'azc-rule-edit-kind';
+        kindSelect.className = 'form-select';
+        const kFull = document.createElement('option');
+        kFull.value = 'full';
+        kFull.textContent = tAzc('Full-day holiday');
+        const kHalf = document.createElement('option');
+        kHalf.value = 'half';
+        kHalf.textContent = tAzc('Half-day holiday');
+        kindSelect.appendChild(kFull);
+        kindSelect.appendChild(kHalf);
+        kindSelect.value = rule.kind === 'half' ? 'half' : 'full';
+        kindField.appendChild(kindLabel);
+        kindField.appendChild(kindSelect);
+        form.appendChild(kindField);
+
+        const yearField = document.createElement('div');
+        yearField.className = 'form-group';
+        const yearLabel = document.createElement('label');
+        yearLabel.className = 'form-label';
+        yearLabel.setAttribute('for', 'azc-rule-edit-start-year');
+        yearLabel.textContent = tAzc('Start year');
+        const yearInput = document.createElement('input');
+        yearInput.type = 'number';
+        yearInput.id = 'azc-rule-edit-start-year';
+        yearInput.className = 'form-input';
+        yearInput.min = '1970';
+        yearInput.max = '2100';
+        yearInput.step = '1';
+        yearInput.required = true;
+        yearInput.value = String(rule.start_year != null ? rule.start_year : getSelectedYear());
+        yearField.appendChild(yearLabel);
+        yearField.appendChild(yearInput);
+        form.appendChild(yearField);
+
+        const errorEl = document.createElement('p');
+        errorEl.className = 'azc-field-error';
+        errorEl.hidden = true;
+        errorEl.setAttribute('role', 'alert');
+        form.appendChild(errorEl);
+
+        const footer = document.createElement('div');
+        footer.className = 'azc-dialog__actions';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = 'azc-btn azc-btn--primary';
+        saveBtn.textContent = tAzc('Save rule');
+        Utils.on(saveBtn, 'click', function() {
+            const name = nameInput.value.trim();
+            const startYear = parseInt(yearInput.value, 10);
+            if (!name) {
+                errorEl.textContent = tAzc('Please specify date and name of the holiday.');
+                errorEl.hidden = false;
+                nameInput.setAttribute('aria-invalid', 'true');
+                nameInput.focus();
+                return;
+            }
+            if (isNaN(startYear) || startYear < 1970 || startYear > 2100) {
+                errorEl.textContent = tAzc('Start year must be between 1970 and 2100.');
+                errorEl.hidden = false;
+                yearInput.setAttribute('aria-invalid', 'true');
+                yearInput.focus();
+                return;
+            }
+            errorEl.hidden = true;
+            saveRuleChanges(ruleId, {
+                name: name,
+                kind: kindSelect.value,
+                start_year: startYear
+            });
+            dialog.close();
+            dialog.remove();
+        });
+        footer.appendChild(saveBtn);
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'azc-btn azc-btn--secondary';
+        cancelBtn.textContent = tAzc('Cancel');
+        Utils.on(cancelBtn, 'click', function() {
+            dialog.close();
+            dialog.remove();
+        });
+        footer.appendChild(cancelBtn);
+
+        form.appendChild(footer);
+        dialog.appendChild(form);
+        document.body.appendChild(dialog);
+
+        dialog.addEventListener('close', function() {
+            if (dialog.parentNode) {
+                dialog.remove();
+            }
+        });
+        dialog.showModal();
+    }
+
+    function saveRuleChanges(ruleId, payload) {
+        const url = ruleApiBase() + '/' + encodeURIComponent(String(ruleId));
+        fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'requesttoken': OC.requestToken
+            },
+            body: JSON.stringify(payload)
+        }).then(function(response) {
+            return response.json();
+        }).then(function(data) {
+            if (data && data.success) {
+                showUserSuccess(tAzc('Rule was saved.'));
+                loadExistingHolidays();
+            } else {
+                showUserError((data && data.error) || tAzc('Rule could not be saved.'));
+            }
+        }).catch(function() {
+            showUserError(tAzc('Rule could not be saved.'));
+        });
+    }
+
+    /**
+     * Convert action on a persisted custom/company row (B-R7): the row becomes
+     * a rule covering every year from the selected one, and the source row is
+     * removed (the rule replaces it — dedup keeps the display consistent).
+     */
+    function convertRowToRule(item, row) {
+        const Components = window.AzcComponents || window.ArbeitszeitCheckComponents;
+        const name = item.name || '';
+        const year = getSelectedYear();
+        const doConvert = function() {
+            // Atomic convert endpoint: rule creation + source-row delete run
+            // under the named catalog lock — never a two-call race window.
+            const url = OC.generateUrl('/apps/arbeitszeitcheck/api/admin/state-holidays/' +
+                encodeURIComponent(String(item.id)) + '/recurring');
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'requesttoken': OC.requestToken
+                },
+                body: JSON.stringify({})
+            }).then(function(response) {
+                return response.json();
+            }).then(function(data) {
+                if (data && data.success) {
+                    showUserSuccess(tAzc('Annual rule "{name}" was created.').replace('{name}', name));
+                    loadExistingHolidays();
+                } else {
+                    showUserError((data && data.error) || tAzc('Rule could not be saved.'));
+                }
+            }).catch(function() {
+                showUserError(tAzc('Rule could not be saved.'));
+            });
+        };
+
+        const title = tAzc('Convert "{name}" into an annual rule?').replace('{name}', name);
+        const message = tAzc('The rule replaces this entry and produces the day every year from {year} on.')
+            .replace('{year}', String(year));
+        if (Components && typeof Components.confirmDialog === 'function') {
+            Components.confirmDialog({
+                title: title,
+                message: message,
+                confirmLabel: tAzc('Repeat annually'),
+                cancelLabel: tAzc('Cancel'),
+                variant: 'info',
+            }).then(function(result) {
+                if (result === true || (result && result.confirmed)) {
+                    doConvert();
+                }
+            });
+        } else {
+            doConvert();
+        }
     }
 
     /**
@@ -1108,8 +1823,30 @@
             handleCountryChange: handleCountryChange,
             handleRegionChange: handleRegionChange,
             confirmRemoveHoliday: confirmRemoveHoliday,
+            appendExistingHolidayRow: appendExistingHolidayRow,
+            buildSuggestionItem: buildSuggestionItem,
+            buildRepeatExtrasRow: buildRepeatExtrasRow,
+            buildRuleInstanceActions: buildRuleInstanceActions,
+            openRuleRemoveChoiceDialog: openRuleRemoveChoiceDialog,
+            openRuleEditDialog: openRuleEditDialog,
+            convertRowToRule: convertRowToRule,
+            addSuggestionAnnually: addSuggestionAnnually,
+            skipRuleYear: skipRuleYear,
+            restoreSkippedInstance: restoreSkippedInstance,
+            setRuleActive: setRuleActive,
+            saveRuleChanges: saveRuleChanges,
+            findRuleById: findRuleById,
             setPersistedCountry: function(country) {
                 persistedCountry = String(country || 'DE').toUpperCase();
+            },
+            setHolidayRules: function(rules) {
+                holidayRules = Array.isArray(rules) ? rules : [];
+            },
+            setSkippedRules: function(skipped) {
+                skippedRules = Array.isArray(skipped) ? skipped : [];
+            },
+            getHolidayRules: function() {
+                return holidayRules;
             },
             suggestedKindFromPayload: function(suggestion) {
                 return (suggestion && suggestion.kind === 'half') ? 'half' : 'full';

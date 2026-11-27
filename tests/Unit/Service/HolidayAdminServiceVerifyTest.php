@@ -47,9 +47,16 @@ class HolidayAdminServiceVerifyTest extends TestCase
 				['arbeitszeitcheck', 'statutory_auto_reseed', '1', '1'],
 			]);
 
+		$ruleMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\HolidayRuleMapper::class);
+		$ruleMapper->method('findByState')->willReturn([]);
+		$ruleSkipMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\HolidayRuleSkipMapper::class);
+		$ruleSkipMapper->method('yearsForRuleIds')->willReturn([]);
+
 		$service = new HolidayAdminService(
 			$holidayMapper,
 			$suppressionMapper,
+			$ruleMapper,
+			$ruleSkipMapper,
 			$this->createMock(HolidayService::class),
 			$config,
 		);

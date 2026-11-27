@@ -333,7 +333,12 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'Reformationsdagen',
 		'Kioskterminaler', 'Klar', 'Konto', 'Kontor', 'Korrekt',
 		'L0 · Organisationsstandard', 'Land', 'Leopolds dag', 'Licens', 'Luzern',
-		'Maj', 'Mandantnummer', 'Min status', 'Moderator', 'Modul %1$s: %2$s',
+		'Maj', 'Mandantnummer', 'Min status',
+		// 2026-11-27: 'Mobilapp' — genuine Swedish compound (mobil+app);
+		// identical spelling in da is shared vocabulary, not bleed
+		// (msgid 'Mobile').
+		'Mobilapp',
+		'Moderator', 'Modul %1$s: %2$s',
 		'Moduler', 'Mål', 'Nej', 'Netto', 'Nextcloud-instans-ID',
 		'Normal pendling', 'Ny PIN', 'Ny version', 'Om', 'Ons',
 		'Organisation', 'Organisationen', 'Organisationslicens',
@@ -348,7 +353,13 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		// is shared vocabulary, not bleed.
 		'Skriver data',
 		'Slut', 'Slutminut', 'Sluttid',
-		'Starttid', 'Station', 'Statistik', 'Status: %1$s - I dag: %2$s t',
+		'Starttid',
+		// 2026-11-27: 'Startår'/'årlig' — genuine Swedish, identical
+		// spelling in da is shared vocabulary (start+år compound; 'årlig'
+		// = annual in both), not bleed (msgids 'Start year' / 'annual',
+		// recurring holiday rules).
+		'Startår', 'årlig',
+		'Station', 'Statistik', 'Status: %1$s - I dag: %2$s t',
 		'Status: %1$s, i dag: %2$s t', 'Statusfilter', 'Struktur',
 		'System (modul)', 'Teammedlem', 'Terminal-app på Google Play',
 		'Terminaler', 'Tidslinje', 'Tidslinjevisning', 'Tidsregistrering',
@@ -888,7 +899,12 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'lager', 'lagring', 'lagringen', 'landet', 'landsprofil', 'ledig', 'lektioner', 'leopolds', 'licens',
 		'licensadministration', 'licensdata', 'licensen', 'licenser', 'licensformat', 'licenssignatur',
 		'ligger', 'lokalt', 'luzern', 'låser', 'mandantnummer', 'markering', 'medlem', 'metoder',
-		'migrering', 'migreringen', 'mindre', 'minut', 'mobil', 'mobilappen', 'modellen', 'modellens',
+		'migrering', 'migreringen', 'mindre', 'minut', 'mobil',
+		// 2026-11-27: 'mobilapp' — genuine Swedish indefinite compound
+		// (mobil+app); 'mobilappen' was already registered — identical
+		// spelling in da is shared vocabulary, not bleed (msgid 'Mobile').
+		'mobilapp',
+		'mobilappen', 'modellen', 'modellens',
 		'modeller', 'modul', 'moduler', 'målområdet', 'nationaldag', 'natten',
 		'nattens', 'negativt', 'netto', 'normalt', 'notifikation', 'nummer', 'objekt', 'obligatorisk',
 		'offentlig', 'oktober', 'område', 'området', 'onlinestatus', 'onsdag', 'organisationen',
@@ -909,11 +925,22 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'regelresultatet', 'regionen', 'regionens', 'register', 'registrering', 'registreringen',
 		'registreringsdetaljer', 'regler', 'rekordtid', 'resultat', 'resultatet', 'resumé', 'revisionslog',
 		'revisionsregister', 'rotation', 'ruperts', 'rådgivning', 'satser', 'schweiz', 'schweizisk',
-		'sekunder', 'separat', 'serverproblem', 'sessionen', 'sessioner', 'signatur', 'simulering',
+		'sekunder', 'separat',
+		// 2026-11-27: 'serien' — genuine Swedish definite noun ("the
+		// series"); identical orthography in da is shared vocabulary,
+		// not bleed (msgid 'Stop series', recurring holiday rules).
+		'serien',
+		'serverproblem', 'sessionen', 'sessioner', 'signatur', 'simulering',
 		'skift', 'skriv', 'skriver', 'skulle', 'slutminut', 'sluttid', 'sluttiden', 'sluttider',
 		'sluttidsformat', 'snart', 'sortering', 'specificitet', 'specifik', 'specifikt', 'sponsorer',
 		'stabil', 'standarden', 'standarder', 'standardkalender', 'standardregion',
-		'standardregionen', 'starten', 'startpunkter', 'starttid', 'starttidsformat', 'statistik',
+		'standardregionen', 'starten', 'startpunkter', 'starttid', 'starttidsformat',
+		// 2026-11-27: 'startår'/'startåret' — genuine Swedish compounds
+		// (start+år, cf. 'skottår'; definite form "the start year");
+		// identical orthography in da is shared vocabulary, not bleed
+		// (msgids 'Start year' / 'Start year must be …', holiday rules).
+		'startår', 'startåret',
+		'statistik',
 		'statusfilter', 'statussektioner', 'strikt', 'struktur', 'strukturen',
 		'synkronisering', 'synlig', 'systemet', 'tabellen', 'tabeller', 'taget', 'teamet', 'teamets',
 		'teammedlem', 'teammedlemmer', 'teamrapport', 'teamrapporten', 'teamrapporter', 'teamregel',
@@ -983,11 +1010,20 @@ final class L10nScandinavianQualityContractTest extends TestCase
 		'elementem', 'elementu', 'elementy', 'formatu', 'formaty', 'formularz', 'globalne', 'hierarchii', 'historia',
 		'historii', 'historią', 'historię', 'importu', 'importy', 'kantonu', 'katalogu', 'kategoria',
 		'kategorii', 'kategorię', 'kohorty', 'komputer', 'kontrole', 'laptopa', 'leopolda', 'minimalne',
-		'mobilne', 'momentu', 'normalne', 'outlooku', 'problemu', 'problemy', 'procent', 'profilu',
+		'mobilne', 'momentu', 'normalne', 'outlooku',
+		// 2026-11-27: 'partnera' — Polish genitive of 'partner' ("Przejdź
+		// do partnera"), lev≤1 of donor 'partner' by declension, not bleed.
+		'partnera',
+		'problemu', 'problemy', 'procent', 'profilu',
 		'projektem', 'projektu', 'projekty', 'regionu', 'ruperta', 'schemat', 'segmenty', 'statusu',
 		'statusy', 'struktura', 'struktury', 'strukturę', 'sugestie', 'symulator', 'systemu', 'tabletu',
 		'tablety', 'telefonu', 'terminala', 'terminale', 'terminali', 'terminalu', 'terminem', 'terminie',
-		'thunderbirda', 'weekendy',
+		'thunderbirda',
+		// 2026-11-27: 'wariant' — genuine Polish noun ("stary wariant
+		// zapasowy" = legacy fallback variant); lev≤1 of donor 'variant'
+		// via the shared pan-European stem, not copy-adapt bleed.
+		'wariant',
+		'weekendy',
 	];
 
 	/**

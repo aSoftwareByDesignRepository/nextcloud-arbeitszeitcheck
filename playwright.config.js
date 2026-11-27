@@ -110,6 +110,12 @@ const STATEFUL_SPECS = [
   // Custom absence-type CRUD writes the shared type catalog — a parallel
   // spec enumerating types can observe a phantom row mid-flight.
   /admin-absence-types\.spec\.js/,
+  // Holiday-rule writes hit the shared (state, rule_key) catalog AND the
+  // gate-warning test flips the GLOBAL leave_soll_effects /
+  // paid_absence_planned_hours_credit settings — parallel specs could
+  // observe the flipped gates or a phantom rule row mid-assert. Same
+  // shared-state class as admin-holidays-auto-restore + admin-absence-types.
+  /admin-holidays-recurring\.spec\.js/,
   // Creates/deletes absence rows on the shared e2e_employee — a parallel
   // absence mutation holds the per-account change lock → "Another absence
   // change is in progress" (locked) mid-suite (observed 2026-10-17).

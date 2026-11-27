@@ -8,13 +8,17 @@ declare(strict_types=1);
  * Two gates, one matrix ({@see AbsenceTypeCatalog::sollEffect}):
  *
  * - `paid_absence_planned_hours_credit` (opt-in, default off): approved
- *   `sick_leave` / `child_sick` / custom `soll_credit` types on a planned day
- *   (weekday schedule, DutyCheck rotation incl. Sat/Sun, or legacy Mon–Fri
- *   daily hours) add those planned net hours to overtime Ist.
+ *   `sick_leave` / `child_sick` on a planned day (weekday schedule, DutyCheck
+ *   rotation incl. Sat/Sun, or legacy Mon–Fri daily hours) add those planned
+ *   net hours to overtime Ist.
  * - `leave_soll_effects` (default on): approved `vacation` / `personal_leave` /
  *   `special_leave` credit the same way — leave pay continuation is not an org
  *   policy choice — while `unpaid_leave` / `parental_leave` *reduce* the day's
  *   Soll instead of crediting Ist (contract suspended: neutral, never paid).
+ * - Custom types with `soll_credit` credit when EITHER gate is on (OR): the
+ *   flag is an explicit "paid absence" intent that belongs to the leave
+ *   family, so `leave_soll_effects` covers them and the sick opt-in keeps
+ *   working for orgs that enabled it before the split.
  *
  * Non-goals: payroll money, inventing weekend Soll where nothing was planned,
  * per-type admin overrides of the built-in matrix (custom types have their own
@@ -75,8 +79,8 @@ class PaidAbsencePlannedHoursCreditService
 
 	/**
 	 * Paid-leave types governed by the leave-effects gate rather than the sick
-	 * opt-in. Custom types always follow the sick opt-in flag — their
-	 * `soll_credit` flag documents the Entgeltausfall family they joined.
+	 * opt-in. Custom types credit under an OR of both gates — their
+	 * `soll_credit` flag is explicit admin intent for paid leave (A-R1).
 	 */
 	private const LEAVE_CREDIT_TYPES = [
 		Absence::TYPE_VACATION,
@@ -200,7 +204,11 @@ class PaidAbsencePlannedHoursCreditService
 	 *  - not_approved     — pending/declined/cancelled absences never count
 	 *  - effect_none      — type is worked/neutral by design (business trip,
 	 *                       home office, overtime compensation)
-	 *  - gate_disabled    — type would count but the org policy gate is off
+	 *  - type_not_paid    — custom type without the "counts as paid absence"
+	 *                       flag; it is worked/neutral by admin choice
+	 *  - gate_disabled    — type would count but the org policy gate is off;
+	 *                       carries an extra `gate` field with the config key
+	 *                       of the recommended setting
 	 *  - no_planned_hours — creditable, but no planned work time on those
 	 *                       days (weekend, holiday, on-demand contract)
 	 *  - fully_worked     — creditable days, but clocked time already
@@ -262,15 +270,22 @@ class PaidAbsencePlannedHoursCreditService
 			}
 			$effect = AbsenceTypeCatalog::sollEffect($absence->getType());
 			if ($effect === AbsenceTypeCatalog::SOLL_EFFECT_NONE) {
-				$result['not_counted'][] = $this->breakdownNotCounted($absence, 'effect_none');
+				$reason = AbsenceTypeCatalog::isCustom($absence->getType())
+					? 'type_not_paid'
+					: 'effect_none';
+				$result['not_counted'][] = $this->breakdownNotCounted($absence, $reason);
 				continue;
 			}
 			if ($effect === AbsenceTypeCatalog::SOLL_EFFECT_CREDIT_IST && !$this->creditGateAllows($absence->getType())) {
-				$result['not_counted'][] = $this->breakdownNotCounted($absence, 'gate_disabled');
+				$item = $this->breakdownNotCounted($absence, 'gate_disabled');
+				$item['gate'] = $this->creditGateRecommendation($absence->getType());
+				$result['not_counted'][] = $item;
 				continue;
 			}
 			if ($effect === AbsenceTypeCatalog::SOLL_EFFECT_REDUCE_SOLL && !$leaveEffectsOn) {
-				$result['not_counted'][] = $this->breakdownNotCounted($absence, 'gate_disabled');
+				$item = $this->breakdownNotCounted($absence, 'gate_disabled');
+				$item['gate'] = Constants::CONFIG_LEAVE_SOLL_EFFECTS;
+				$result['not_counted'][] = $item;
 				continue;
 			}
 
@@ -685,15 +700,35 @@ class PaidAbsencePlannedHoursCreditService
 
 	/**
 	 * Which gate governs a creditable type: leave types follow the
-	 * leave-effects flag, the Entgeltausfall family (sick + custom
-	 * `soll_credit`) follows the sick opt-in flag.
+	 * leave-effects flag; sick builtins stay strictly behind the sick
+	 * opt-in; custom `soll_credit` types open when EITHER gate is on —
+	 * their paid flag is an explicit admin intent (like paid leave), and
+	 * both gates disable them only together.
 	 */
 	private function creditGateAllows(string $type): bool
 	{
 		if (in_array($type, self::LEAVE_CREDIT_TYPES, true)) {
 			return $this->isLeaveEffectsEnabled();
 		}
+		if (AbsenceTypeCatalog::isCustom($type)) {
+			return $this->isEnabled() || $this->isLeaveEffectsEnabled();
+		}
 		return $this->isEnabled();
+	}
+
+	/**
+	 * Config key of the setting the org should open to unblock a
+	 * gate-disabled credit — surfaced as `gate` on not_counted breakdown
+	 * items (A-R5). Custom types recommend the leave gate because their
+	 * `soll_credit` flag marks them as paid leave; sick builtins keep
+	 * their dedicated opt-in.
+	 */
+	private function creditGateRecommendation(string $type): string
+	{
+		if (in_array($type, self::LEAVE_CREDIT_TYPES, true) || AbsenceTypeCatalog::isCustom($type)) {
+			return Constants::CONFIG_LEAVE_SOLL_EFFECTS;
+		}
+		return Constants::CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT;
 	}
 
 	/**

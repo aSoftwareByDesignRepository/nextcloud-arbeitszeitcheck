@@ -93,18 +93,48 @@ final class AustrianStatutoryHolidayCatalog implements HolidayCatalogInterface
 	 */
 	public static function getSuggestedCompanyHolidaysForRegionAndYear(string $region, int $year): array
 	{
+		$out = [];
+		foreach (self::getSuggestedCompanyHolidayEntriesForRegionAndYear($region, $year) as $date => $entry) {
+			$out[$date] = $entry['name'];
+		}
+		return $out;
+	}
+
+	/**
+	 * Structured suggestion entries (B-R4): each carries its rule anchor so
+	 * "add annually" creates a semantically correct rule (Good Friday as an
+	 * easter-offset rule, fixed days as date anchors) — never inferred from
+	 * date equality.
+	 *
+	 * @return array<string, array{name: string, anchor: array{type: string, month?: int, day?: int, offset?: int}}>
+	 */
+	public static function getSuggestedCompanyHolidayEntriesForRegionAndYear(string $region, int $year): array
+	{
 		$region = strtoupper(trim($region));
 		$suggestions = [];
 
 		$easter = EasterCalculator::easterDate($year);
-		$suggestions[$easter->modify('-2 days')->format('Y-m-d')] = 'Good Friday';
+		$suggestions[$easter->modify('-2 days')->format('Y-m-d')] = [
+			'name' => 'Good Friday',
+			'anchor' => ['type' => 'easter', 'offset' => -2],
+		];
 
 		foreach (self::REGIONAL_SUGGESTION_DAYS[$region] ?? [] as $md => $name) {
-			$suggestions[sprintf('%04d-%s', $year, $md)] = $name;
+			[$m, $d] = array_map('intval', explode('-', $md));
+			$suggestions[sprintf('%04d-%s', $year, $md)] = [
+				'name' => $name,
+				'anchor' => ['type' => 'date', 'month' => $m, 'day' => $d],
+			];
 		}
 
-		$suggestions[sprintf('%04d-12-24', $year)] = 'Christmas Eve';
-		$suggestions[sprintf('%04d-12-31', $year)] = 'New Year\'s Eve';
+		$suggestions[sprintf('%04d-12-24', $year)] = [
+			'name' => 'Christmas Eve',
+			'anchor' => ['type' => 'date', 'month' => 12, 'day' => 24],
+		];
+		$suggestions[sprintf('%04d-12-31', $year)] = [
+			'name' => 'New Year\'s Eve',
+			'anchor' => ['type' => 'date', 'month' => 12, 'day' => 31],
+		];
 
 		ksort($suggestions);
 

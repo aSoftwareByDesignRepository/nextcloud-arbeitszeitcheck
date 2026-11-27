@@ -31,32 +31,32 @@ class Version1060Date20261124090000 extends SimpleMigrationStep
 	{
 		/** @var ISchemaWrapper $schema */
 		$schema = $schemaClosure();
-		if ($schema->hasTable(self::TABLE)) {
-			return null;
+		if (!$schema->hasTable('azc_widget_tokens')) {
+			$table = $schema->createTable(self::TABLE);
+			$table->addColumn('id', Types::BIGINT, [
+				'autoincrement' => true, 'notnull' => true, 'unsigned' => true,
+			]);
+			$table->addColumn('user_id', Types::STRING, [
+				'notnull' => true, 'length' => 64,
+			]);
+			$table->addColumn('token_hash', Types::STRING, [
+				'notnull' => true, 'length' => 64, // SHA-256 of the raw token — never the raw token
+			]);
+			$table->addColumn('scope', Types::STRING, [
+				'notnull' => true, 'length' => 64, // 'azc-clock' only (E.6 deny-by-default)
+			]);
+			$table->addColumn('device_label', Types::STRING, [
+				'notnull' => false, 'length' => 128,
+			]);
+			$table->addColumn('created_at', Types::DATETIME, ['notnull' => true]);
+			$table->addColumn('expires_at', Types::DATETIME, ['notnull' => false]);
+			$table->addColumn('revoked_at', Types::DATETIME, ['notnull' => false]);
+			$table->addColumn('last_used_at', Types::DATETIME, ['notnull' => false]);
+			$table->setPrimaryKey(['id']);
+			$table->addUniqueIndex(['token_hash'], 'azc_wtok_hash');
+			$table->addIndex(['user_id'], 'azc_wtok_user');
+			return $schema;
 		}
-		$table = $schema->createTable(self::TABLE);
-		$table->addColumn('id', Types::BIGINT, [
-			'autoincrement' => true, 'notnull' => true, 'unsigned' => true,
-		]);
-		$table->addColumn('user_id', Types::STRING, [
-			'notnull' => true, 'length' => 64,
-		]);
-		$table->addColumn('token_hash', Types::STRING, [
-			'notnull' => true, 'length' => 64, // SHA-256 of the raw token — never the raw token
-		]);
-		$table->addColumn('scope', Types::STRING, [
-			'notnull' => true, 'length' => 64, // 'azc-clock' only (E.6 deny-by-default)
-		]);
-		$table->addColumn('device_label', Types::STRING, [
-			'notnull' => false, 'length' => 128,
-		]);
-		$table->addColumn('created_at', Types::DATETIME, ['notnull' => true]);
-		$table->addColumn('expires_at', Types::DATETIME, ['notnull' => false]);
-		$table->addColumn('revoked_at', Types::DATETIME, ['notnull' => false]);
-		$table->addColumn('last_used_at', Types::DATETIME, ['notnull' => false]);
-		$table->setPrimaryKey(['id']);
-		$table->addUniqueIndex(['token_hash'], 'azc_wtok_hash');
-		$table->addIndex(['user_id'], 'azc_wtok_user');
-		return $schema;
+		return null;
 	}
 }

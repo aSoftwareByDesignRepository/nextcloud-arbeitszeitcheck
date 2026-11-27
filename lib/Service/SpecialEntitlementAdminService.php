@@ -145,6 +145,9 @@ final class SpecialEntitlementAdminService
 		$periodType = $this->enumString($params['periodType'] ?? $params['period_type'] ?? null, SpecialEntitlementType::PERIODS, 'periodType');
 		$labelI18n = $this->labelMap($params['labelI18n'] ?? $params['label_i18n'] ?? null);
 		$confidentialLabel = $this->optionalLabel($params['confidentialLabel'] ?? $params['confidential_label'] ?? null, 'confidentialLabel');
+		// A-R7: entitlements are granted *paid* days off by nature — default on.
+		// Writes soll_credit onto the created or linked custom absence type.
+		$paidLeave = $this->parseBool($params['paidLeave'] ?? $params['paid_leave'] ?? true);
 
 		DbLockGuard::acquire($this->lockingProvider, DbLockKeys::absenceTypeCatalog(), ILockingProvider::LOCK_EXCLUSIVE, 'Absence type catalog');
 		DbLockGuard::acquire($this->lockingProvider, DbLockKeys::policyCatalog('special_entitlement'), ILockingProvider::LOCK_EXCLUSIVE, 'Special entitlement catalog');
@@ -165,7 +168,7 @@ final class SpecialEntitlementAdminService
 					$custom->setCode($absenceTypeCode);
 					$custom->setLabel($publicLabel);
 					$custom->setLabelI18n($labelI18n !== [] ? json_encode($labelI18n, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null);
-					$custom->setSollCredit(false);
+					$custom->setSollCredit($paidLeave);
 					$custom->setMaxDays(365);
 					$custom->setColor('info');
 					$custom->setIcon('calendar-heart');
@@ -174,9 +177,14 @@ final class SpecialEntitlementAdminService
 					$custom->setCreatedBy($actorUid);
 					$custom->setUpdatedAt(new \DateTime());
 					$custom->setUpdatedBy($actorUid);
-					$this->customAbsenceTypes->insert($custom);
+					$custom = $this->customAbsenceTypes->insert($custom);
+					$this->audit->logAction($actorUid, CustomAbsenceTypeService::ACTION_CREATED, CustomAbsenceTypeService::ENTITY_TYPE, (int)$custom->getId(), null, $custom->getSummary(), $actorUid);
 				} else {
 					$this->assertCreatableAbsenceType($absenceTypeCode);
+					// Linking an existing type: the paid-leave choice in the form
+					// is explicit admin intent — write it through to the linked
+					// custom type so the flag and the entitlement cannot drift.
+					$this->applyPaidLeaveToLinkedType($absenceTypeCode, $paidLeave, $actorUid);
 				}
 
 				$type = new SpecialEntitlementType();
@@ -231,8 +239,14 @@ final class SpecialEntitlementAdminService
 		$relinking = !$type->getActive() && (
 			array_key_exists('absenceTypeCode', $params) || array_key_exists('absence_type_code', $params)
 		);
-		if ($relinking) {
-			// Same order as setTypeActive / createAbsence: type before catalog.
+		// A-R7: paidLeave writes through to the linked custom absence type —
+		// the catalog lock must be held for that write too (same order as
+		// setTypeActive / createAbsence: type first, catalog last).
+		$paidLeaveParam = array_key_exists('paidLeave', $params)
+			|| array_key_exists('paid_leave', $params)
+			|| array_key_exists('sollCredit', $params)
+			|| array_key_exists('soll_credit', $params);
+		if ($relinking || $paidLeaveParam) {
 			$locks[] = DbLockKeys::absenceTypeCatalog();
 		}
 		foreach ($locks as $lock) {
@@ -277,6 +291,11 @@ final class SpecialEntitlementAdminService
 			}
 			if (array_key_exists('employeeMaySeeConfidentialLabel', $params) || array_key_exists('employee_may_see_confidential_label', $params)) {
 				$type->setEmployeeMaySeeConfidentialLabel($this->parseBool($params['employeeMaySeeConfidentialLabel'] ?? $params['employee_may_see_confidential_label']));
+			}
+			if ($paidLeaveParam) {
+				$rawPaidLeave = $params['paidLeave'] ?? $params['paid_leave'] ?? $params['sollCredit'] ?? $params['soll_credit'];
+				$this->applyPaidLeaveToLinkedType((string)$type->getAbsenceTypeCode(), $this->parseBool($rawPaidLeave), $actorUid);
+				AbsenceTypeCatalog::resetCustomTypeCache();
 			}
 			$type->setVersion((int)$type->getVersion() + 1);
 			$type->setUpdatedBy($actorUid);
@@ -1149,6 +1168,7 @@ final class SpecialEntitlementAdminService
 			'periodType' => (string)$type->getPeriodType(),
 			'allowNegative' => (bool)$type->getAllowNegative(),
 			'employeeMaySeeConfidentialLabel' => (bool)$type->getEmployeeMaySeeConfidentialLabel(),
+			'paidLeave' => $this->paidLeaveForType($type),
 			'active' => (bool)$type->getActive(),
 			'version' => (int)$type->getVersion(),
 			'createdBy' => $type->getCreatedBy(),
@@ -1240,6 +1260,60 @@ final class SpecialEntitlementAdminService
 			|| !AbsenceTypeCatalog::isCreatable($code)) {
 			throw new SpecialEntitlementException('VALIDATION_ERROR', 'The linked absence type must be an active custom type.', 400, ['absenceTypeCode' => 'custom_required']);
 		}
+	}
+
+	/**
+	 * Paid-leave flag mirrored onto the linked custom absence type (A-R7):
+	 * the entitlement form's "paid" choice is the admin's explicit intent —
+	 * write it through so flag and entitlement cannot drift apart.
+	 */
+	private function applyPaidLeaveToLinkedType(string $absenceTypeCode, bool $paidLeave, string $actorUid): void
+	{
+		try {
+			$custom = $this->customAbsenceTypes->findByCode($absenceTypeCode);
+		} catch (DoesNotExistException) {
+			// Should not happen (linked types are always custom_*) — fail soft:
+			// the entitlement write itself must not fail on a dangling link.
+			return;
+		}
+		if ((bool)$custom->getSollCredit() === $paidLeave) {
+			$this->sollCreditByCode[$absenceTypeCode] = $paidLeave;
+			return;
+		}
+		$oldSummary = $custom->getSummary();
+		$custom->setSollCredit($paidLeave);
+		$custom->setUpdatedBy($actorUid);
+		$custom->setUpdatedAt(new \DateTime());
+		$this->customAbsenceTypes->update($custom);
+		$this->audit->logAction($actorUid, CustomAbsenceTypeService::ACTION_UPDATED, CustomAbsenceTypeService::ENTITY_TYPE, (int)$custom->getId(), $oldSummary, $custom->getSummary(), $actorUid);
+		$this->sollCreditByCode[$absenceTypeCode] = $paidLeave;
+	}
+
+	/**
+	 * Request-scoped soll_credit lookup for adminTypeSummary — one
+	 * findAll() serves every type row (listTypes would otherwise be N+1).
+	 *
+	 * @var array<string,bool>|null
+	 */
+	private ?array $sollCreditByCode = null;
+
+	private function paidLeaveForType(SpecialEntitlementType $type): ?bool
+	{
+		$code = (string)$type->getAbsenceTypeCode();
+		if (!str_starts_with($code, CustomAbsenceType::CODE_PREFIX)) {
+			return null;
+		}
+		if ($this->sollCreditByCode === null) {
+			$this->sollCreditByCode = [];
+			try {
+				foreach ($this->customAbsenceTypes->findAll() as $row) {
+					$this->sollCreditByCode[(string)$row->getCode()] = (bool)$row->getSollCredit();
+				}
+			} catch (\Throwable) {
+				$this->sollCreditByCode = [];
+			}
+		}
+		return $this->sollCreditByCode[$code] ?? null;
 	}
 
 	/** @return array{0:string,1:string} */

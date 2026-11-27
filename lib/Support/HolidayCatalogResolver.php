@@ -71,4 +71,36 @@ final class HolidayCatalogResolver
 
 		return $catalog::getSuggestedCompanyHolidaysForRegionAndYear($region, $year);
 	}
+
+	/**
+	 * Structured suggestion entries incl. rule anchors (B-R4): the anchor
+	 * comes from the catalog itself — date-equality inference is forbidden
+	 * because a fixed MM-DD suggestion can coincidentally land on
+	 * easter+offset in a given year.
+	 *
+	 * @return array<string, array{name: string, anchor: array{type: string, month?: int, day?: int, offset?: int}}>
+	 */
+	public static function suggestedCompanyHolidayEntriesForRegionAndYear(string $region, int $year): array
+	{
+		$catalog = self::catalogClassForRegion($region);
+
+		if (method_exists($catalog, 'getSuggestedCompanyHolidayEntriesForRegionAndYear')) {
+			return $catalog::getSuggestedCompanyHolidayEntriesForRegionAndYear($region, $year);
+		}
+
+		// Legacy fallback: date anchors derived from the resolved day
+		// (never easter — inference rule above).
+		$out = [];
+		foreach ($catalog::getSuggestedCompanyHolidaysForRegionAndYear($region, $year) as $date => $msgid) {
+			$out[$date] = [
+				'name' => $msgid,
+				'anchor' => [
+					'type' => 'date',
+					'month' => (int)substr($date, 5, 2),
+					'day' => (int)substr($date, 8, 2),
+				],
+			];
+		}
+		return $out;
+	}
 }

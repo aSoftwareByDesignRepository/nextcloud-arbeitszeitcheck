@@ -164,6 +164,7 @@
 .absence-type-badge.type-child_sick,
 .absence-type-badge.type-overtime_comp,
 #app-content.azc-app--admin-holidays .admin-holidays-badge--statutory,
+#app-content.azc-app--admin-holidays .admin-holidays-badge--rule,
 .dz-status-badge[data-status="paused"],
 .dz-list-item .dz-badge[data-status="paused"] {
 	--azc-bdg-ink: var(--color-info-text, var(--color-info));
@@ -183,6 +184,7 @@
 .absence-type-badge,
 #app-content.azc-app--admin-holidays .admin-holidays-badge--company,
 #app-content.azc-app--admin-holidays .admin-holidays-badge--custom,
+#app-content.azc-app--admin-holidays .admin-holidays-badge--skipped,
 .dz-status-badge[data-status="clocked_out"],
 .dz-status-badge[data-status="completed"],
 .dz-list-item .dz-badge[data-status="clocked_out"],

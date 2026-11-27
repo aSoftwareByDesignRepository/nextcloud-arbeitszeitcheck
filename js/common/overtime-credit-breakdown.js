@@ -46,14 +46,25 @@
 	const REASON_MSGIDS = {
 		not_approved: 'Not approved — pending, declined or cancelled absences never affect the balance.',
 		effect_none: 'This type counts as productive or neutral time (e.g. business trips, home office) and does not credit hours.',
+		type_not_paid: 'This absence type is not marked as paid leave, so it does not credit hours.',
 		gate_disabled: 'Would credit hours, but this effect is disabled in the organization settings.',
 		no_planned_hours: 'No working time is planned on these days (e.g. weekend or public holiday).',
 		fully_worked: 'Already covered — the tracked working time reaches the planned hours.',
 		overlap: 'Overlaps another absence that credited these days.',
 	};
 
-	function reasonText(code) {
-		return txt(REASON_MSGIDS[code] || code);
+	// A-R5: gate-disabled items carry the config key of the setting an admin
+	// can open — name it so the user knows which switch to ask for.
+	const GATE_MSGIDS = {
+		paid_absence_planned_hours_credit: 'Would credit hours, but crediting planned hours for paid absences is disabled in the organization settings.',
+		leave_soll_effects: 'Would credit hours, but leave effects on planned hours are disabled in the organization settings.',
+	};
+
+	function reasonText(item) {
+		if (item.reason === 'gate_disabled' && typeof item.gate === 'string' && GATE_MSGIDS[item.gate]) {
+			return txt(GATE_MSGIDS[item.gate]);
+		}
+		return txt(REASON_MSGIDS[item.reason] || item.reason);
 	}
 
 	function buildDialog() {
@@ -191,7 +202,7 @@
 		block.appendChild(itemHeader(item, 0, ''));
 		const reason = document.createElement('p');
 		reason.className = 'form-help azc-credit-breakdown__reason';
-		reason.textContent = reasonText(item.reason);
+		reason.textContent = reasonText(item);
 		block.appendChild(reason);
 		footNotes(item).forEach((note) => block.appendChild(note));
 		return block;

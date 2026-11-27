@@ -382,6 +382,13 @@ return [
 		['name' => 'admin#getHolidaySuggestions', 'url' => '/api/admin/state-holidays/suggestions', 'verb' => 'GET'],
 		['name' => 'admin#saveStateHoliday', 'url' => '/api/admin/state-holidays', 'verb' => 'POST'],
 		['name' => 'admin#deleteStateHoliday', 'url' => '/api/admin/state-holidays/{id}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],
+		['name' => 'admin#convertStateHolidayToRule', 'url' => '/api/admin/state-holidays/{id}/recurring', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+		// Recurring holiday rules (annual company/custom days, spec B-R6)
+		['name' => 'admin#createHolidayRule', 'url' => '/api/admin/holiday-rules', 'verb' => 'POST'],
+		['name' => 'admin#updateHolidayRule', 'url' => '/api/admin/holiday-rules/{id}', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
+		['name' => 'admin#addHolidayRuleSkip', 'url' => '/api/admin/holiday-rules/{id}/skips', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+		['name' => 'admin#deleteHolidayRuleSkip', 'url' => '/api/admin/holiday-rules/{id}/skips/{year}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+', 'year' => '\d{4}']],
+		['name' => 'admin#setHolidayRuleActive', 'url' => '/api/admin/holiday-rules/{id}/active', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 		['name' => 'admin#getStatistics', 'url' => '/api/admin/statistics', 'verb' => 'GET'],
 		['name' => 'admin#getDashboardEmployees', 'url' => '/api/admin/dashboard-employees', 'verb' => 'GET'],
 		['name' => 'admin#getAuditLogs', 'url' => '/api/admin/audit-logs', 'verb' => 'GET'],

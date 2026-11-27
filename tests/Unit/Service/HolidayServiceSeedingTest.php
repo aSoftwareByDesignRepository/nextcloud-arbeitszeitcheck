@@ -135,9 +135,16 @@ class HolidayServiceSeedingTest extends TestCase
 				return $this->existingStatutoryIdsByDate[$dateYmd] ?? null;
 			});
 
+		$ruleMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\HolidayRuleMapper::class);
+		$ruleMapper->method('findActiveByState')->willReturn([]);
+		$ruleSkipMapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\HolidayRuleSkipMapper::class);
+		$ruleSkipMapper->method('yearsForRuleIds')->willReturn([]);
+
 		$this->service = new HolidayService(
 			$this->holidayMapper,
 			$this->suppressionMapper,
+			$ruleMapper,
+			$ruleSkipMapper,
 			$this->userSettingsMapper,
 			$this->config,
 			$this->cacheFactory,

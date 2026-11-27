@@ -555,7 +555,7 @@
 
 	/* ---------- create / add-rule editor ---------- */
 
-	const DEFINITION_FIELD_IDS = ['se-label', 'se-unit', 'se-period', 'se-confidential', 'se-absence-type'];
+	const DEFINITION_FIELD_IDS = ['se-label', 'se-unit', 'se-period', 'se-confidential', 'se-absence-type', 'se-paid-leave'];
 
 	function setDefinitionFieldsEnabled(on) {
 		DEFINITION_FIELD_IDS.forEach((id) => {
@@ -600,6 +600,9 @@
 		document.getElementById('se-label').value = currentType.publicLabel;
 		document.getElementById('se-unit').value = currentType.unit;
 		document.getElementById('se-period').value = currentType.periodType;
+		// A-R7: mirror the linked absence type's paid flag (read-only here).
+		const paidEl = document.getElementById('se-paid-leave');
+		if (paidEl) paidEl.checked = currentType.paidLeave !== false;
 		formErrorBox.hidden = true;
 		editor.hidden = false;
 		cohortEditor.hidden = true;
@@ -648,6 +651,7 @@
 					absenceTypeCode: document.getElementById('se-absence-type').value || undefined,
 					unit: document.getElementById('se-unit').value,
 					periodType: document.getElementById('se-period').value,
+					paidLeave: document.getElementById('se-paid-leave') ? document.getElementById('se-paid-leave').checked : true,
 				};
 				const created = await request(root.dataset.typeCreateUrl, { method: 'POST', body: JSON.stringify(def) });
 				typeId = created.item.id;
@@ -725,6 +729,13 @@
 		cohortEditor.hidden = true;
 		detail.hidden = false;
 		document.getElementById('se-detail-title').textContent = item.publicLabel;
+		const detailPaid = document.getElementById('se-detail-paid');
+		if (detailPaid) {
+			detailPaid.checked = item.paidLeave === true;
+			detailPaid.disabled = item.paidLeave === null || item.paidLeave === undefined;
+		}
+		const detailPaidStatus = document.getElementById('se-detail-paid-status');
+		if (detailPaidStatus) detailPaidStatus.textContent = '';
 		const addRuleBtn = document.getElementById('se-add-rule');
 		if (addRuleBtn) {
 			addRuleBtn.textContent = t('Add rule to %1$s').replace('%1$s', item.publicLabel);
@@ -865,6 +876,33 @@
 	});
 
 	detailAddPolicyBtn.addEventListener('click', () => openPolicyEditor(detailAddPolicyBtn));
+
+	const detailPaidEl = document.getElementById('se-detail-paid');
+	if (detailPaidEl) detailPaidEl.addEventListener('change', async () => {
+		if (!currentType) return;
+		const status = document.getElementById('se-detail-paid-status');
+		const wanted = detailPaidEl.checked;
+		detailPaidEl.disabled = true;
+		try {
+			const body = await request(tpl('typeUpdateTemplate', currentType.id), {
+				method: 'PUT',
+				body: JSON.stringify({ paidLeave: wanted, version: currentType.version }),
+			});
+			if (body && body.item) {
+				currentType = body.item;
+				const idx = types.findIndex((x) => x.id === body.item.id);
+				if (idx >= 0) types[idx] = body.item;
+			}
+			if (status) status.textContent = t('Saved.');
+		} catch (e) {
+			detailPaidEl.checked = !wanted;
+			if (status) status.textContent = e.message;
+			announce(e.message);
+			if (e.status === 409) { void loadTypes(); }
+		} finally {
+			detailPaidEl.disabled = currentType ? (currentType.paidLeave === null || currentType.paidLeave === undefined) : true;
+		}
+	});
 
 	const traceRunEl = document.getElementById('se-trace-run');
 	if (traceRunEl) traceRunEl.addEventListener('click', async () => {

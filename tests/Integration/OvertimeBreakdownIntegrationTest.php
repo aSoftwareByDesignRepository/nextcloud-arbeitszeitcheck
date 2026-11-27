@@ -17,10 +17,13 @@ namespace OCA\ArbeitszeitCheck\Tests\Integration;
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
+use OCA\ArbeitszeitCheck\Db\CustomAbsenceTypeMapper;
 use OCA\ArbeitszeitCheck\Db\TimeEntry;
 use OCA\ArbeitszeitCheck\Db\TimeEntryMapper;
+use OCA\ArbeitszeitCheck\Service\CustomAbsenceTypeService;
 use OCA\ArbeitszeitCheck\Service\OvertimeService;
 use OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService;
+use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
 use OCA\ArbeitszeitCheck\Support\ScheduledWorkdayCounter;
 use OCA\ArbeitszeitCheck\Support\TypedAppConfigWrite;
 use OCP\IConfig;
@@ -40,6 +43,8 @@ final class OvertimeBreakdownIntegrationTest extends TestCase
 	private array $createdAbsenceIds = [];
 	/** @var list<int> */
 	private array $createdEntryIds = [];
+	/** @var list<int> */
+	private array $createdTypeIds = [];
 
 	protected function setUp(): void
 	{
@@ -100,6 +105,14 @@ final class OvertimeBreakdownIntegrationTest extends TestCase
 			} catch (\Throwable) {
 			}
 		}
+		foreach ($this->createdTypeIds as $id) {
+			try {
+				$mapper = \OCP\Server::get(CustomAbsenceTypeMapper::class);
+				$mapper->delete($mapper->find($id));
+			} catch (\Throwable) {
+			}
+		}
+		AbsenceTypeCatalog::resetCustomTypeCache();
 		$config = \OCP\Server::get(IConfig::class);
 		foreach ([
 			Constants::CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT => $this->prevSickCredit,
@@ -298,5 +311,143 @@ final class OvertimeBreakdownIntegrationTest extends TestCase
 		$reasons = array_column($bd['not_counted'], 'reason', 'absence_id');
 		$this->assertSame('fully_worked', $reasons[(int)$row->getId()] ?? null);
 		$this->assertEqualsWithDelta(0.0, $bd['credit_hours'], 0.0001);
+	}
+
+	/**
+	 * Flip the two credit gates mid-test (setUp pins sick=0/leave=1).
+	 */
+	private function gates(string $sickOptIn, string $leaveEffects): void
+	{
+		$config = \OCP\Server::get(IConfig::class);
+		TypedAppConfigWrite::setString($config, 'arbeitszeitcheck', Constants::CONFIG_PAID_ABSENCE_PLANNED_HOURS_CREDIT, $sickOptIn);
+		TypedAppConfigWrite::setString($config, 'arbeitszeitcheck', Constants::CONFIG_LEAVE_SOLL_EFFECTS, $leaveEffects);
+	}
+
+	/**
+	 * Register a real custom absence type row (Part A: the `sollCredit`
+	 * flag decides whether it joins the Entgeltausfall credit family).
+	 *
+	 * @return string the assigned `custom_*` code
+	 */
+	private function createCustomType(string $label, bool $sollCredit): string
+	{
+		$result = \OCP\Server::get(CustomAbsenceTypeService::class)->create(
+			['label' => $label, 'sollCredit' => $sollCredit ? '1' : '0'],
+			'it-admin',
+		);
+		$this->assertSame(201, $result['code'], json_encode($result));
+		$this->createdTypeIds[] = (int)$result['data']['id'];
+		AbsenceTypeCatalog::resetCustomTypeCache();
+		return (string)$result['data']['code'];
+	}
+
+	/**
+	 * A-R1 customer case: a paid-leave custom type credits when ONLY the
+	 * sick opt-in is open — the OR-gate means either policy switch lets an
+	 * explicitly paid type through.
+	 */
+	public function testCustomSollCreditTypeCreditsUnderSickGateOnly(): void
+	{
+		$this->gates('1', '0');
+		$code = $this->createCustomType('Sonderurlaub OR-' . bin2hex(random_bytes(2)), true);
+		$day = $this->workDay(11);
+		$row = $this->insertAbsence($code, Absence::STATUS_APPROVED, $day, $day, 1.0);
+
+		$start = new \DateTime($day);
+		$svc = \OCP\Server::get(PaidAbsencePlannedHoursCreditService::class);
+		$bd = $svc->creditBreakdownForRange($this->uid, $start, new \DateTime($day));
+		$agg = $svc->creditHoursForRange($this->uid, $start, new \DateTime($day));
+
+		$this->assertContains((int)$row->getId(), array_column($bd['credited'], 'absence_id'));
+		$this->assertGreaterThan(0.0, $bd['credit_hours']);
+		$this->assertSame($bd['credit_hours'], $agg['hours'], 'breakdown must reconcile with the aggregate path');
+	}
+
+	/**
+	 * The leave-effects gate alone also opens a `soll_credit` type —
+	 * symmetrical OR-gate leg.
+	 */
+	public function testCustomSollCreditTypeCreditsUnderLeaveGateOnly(): void
+	{
+		$this->gates('0', '1');
+		$code = $this->createCustomType('Paid leave ' . bin2hex(random_bytes(2)), true);
+		$day = $this->workDay(12);
+		$row = $this->insertAbsence($code, Absence::STATUS_APPROVED, $day, $day, 1.0);
+
+		$start = new \DateTime($day);
+		$svc = \OCP\Server::get(PaidAbsencePlannedHoursCreditService::class);
+		$bd = $svc->creditBreakdownForRange($this->uid, $start, new \DateTime($day));
+
+		$this->assertContains((int)$row->getId(), array_column($bd['credited'], 'absence_id'));
+		$this->assertGreaterThan(0.0, $bd['credit_hours']);
+	}
+
+	/**
+	 * Both gates closed: the paid-leave type reports `gate_disabled` with
+	 * the leave-effects key as the unblock recommendation (A-R5) — never
+	 * silently zero.
+	 */
+	public function testCustomSollCreditBlockedByBothGatesClosedWithGateHint(): void
+	{
+		$this->gates('0', '0');
+		$code = $this->createCustomType('Blocked paid ' . bin2hex(random_bytes(2)), true);
+		$day = $this->workDay(13);
+		$row = $this->insertAbsence($code, Absence::STATUS_APPROVED, $day, $day, 1.0);
+
+		$start = new \DateTime($day);
+		$svc = \OCP\Server::get(PaidAbsencePlannedHoursCreditService::class);
+		$bd = $svc->creditBreakdownForRange($this->uid, $start, new \DateTime($day));
+		$agg = $svc->creditHoursForRange($this->uid, $start, new \DateTime($day));
+
+		$this->assertEqualsWithDelta(0.0, $bd['credit_hours'], 0.0001);
+		$this->assertSame($bd['credit_hours'], $agg['hours']);
+		$byId = array_column($bd['not_counted'], null, 'absence_id');
+		$item = $byId[(int)$row->getId()] ?? null;
+		$this->assertNotNull($item, 'gate-blocked custom type must explain itself');
+		$this->assertSame('gate_disabled', $item['reason']);
+		$this->assertSame(Constants::CONFIG_LEAVE_SOLL_EFFECTS, $item['gate']);
+	}
+
+	/**
+	 * A custom type WITHOUT the paid-leave flag is worked/neutral time by
+	 * admin choice — `type_not_paid`, distinct from built-in `effect_none`.
+	 */
+	public function testCustomTypeWithoutPaidFlagReportsTypeNotPaid(): void
+	{
+		$this->gates('1', '1');
+		$code = $this->createCustomType('Neutral ' . bin2hex(random_bytes(2)), false);
+		$day = $this->workDay(15);
+		$row = $this->insertAbsence($code, Absence::STATUS_APPROVED, $day, $day, 1.0);
+
+		$start = new \DateTime($day);
+		$svc = \OCP\Server::get(PaidAbsencePlannedHoursCreditService::class);
+		$bd = $svc->creditBreakdownForRange($this->uid, $start, new \DateTime($day));
+
+		$byId = array_column($bd['not_counted'], null, 'absence_id');
+		$item = $byId[(int)$row->getId()] ?? null;
+		$this->assertNotNull($item);
+		$this->assertSame('type_not_paid', $item['reason']);
+		$this->assertArrayNotHasKey('gate', $item, 'type_not_paid is a type property, not a gate hint');
+	}
+
+	/**
+	 * Regression guard for the OR-gate: the sick opt-in alone must NOT open
+	 * built-in leave types (they still follow leave_effects exclusively).
+	 */
+	public function testSickGateAloneDoesNotCreditBuiltinVacation(): void
+	{
+		$this->gates('1', '0');
+		$day = $this->workDay(16);
+		$row = $this->insertAbsence(Absence::TYPE_VACATION, Absence::STATUS_APPROVED, $day, $day, 1.0);
+
+		$start = new \DateTime($day);
+		$svc = \OCP\Server::get(PaidAbsencePlannedHoursCreditService::class);
+		$bd = $svc->creditBreakdownForRange($this->uid, $start, new \DateTime($day));
+
+		$byId = array_column($bd['not_counted'], null, 'absence_id');
+		$item = $byId[(int)$row->getId()] ?? null;
+		$this->assertNotNull($item);
+		$this->assertSame('gate_disabled', $item['reason']);
+		$this->assertSame(Constants::CONFIG_LEAVE_SOLL_EFFECTS, $item['gate']);
 	}
 }

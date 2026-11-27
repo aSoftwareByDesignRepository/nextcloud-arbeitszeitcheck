@@ -38,6 +38,8 @@ final class SchemaTableCatalog
 		'at_entitlement_snapshots',
 		'at_entries',
 		'at_ext_stamp',
+		'at_holiday_rule_skips',
+		'at_holiday_rules',
 		'at_holiday_suppress',
 		'at_holidays',
 		'at_kiosk_creds',

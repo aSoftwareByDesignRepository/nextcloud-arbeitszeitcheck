@@ -68,6 +68,7 @@ areal
 arkivere
 arkivet
 arver
+askeonsdag
 attende
 automatisk
 automatiske
@@ -307,6 +308,7 @@ faktureres
 fakturering
 faktureringstimer
 falsk
+familien
 faste
 februar
 feedet
@@ -387,6 +389,7 @@ forbundsstaten
 fordele
 fordelt
 fordi
+forekomsten
 forenklet
 foreslå
 forhold
@@ -867,6 +870,7 @@ miste
 mister
 mistet
 mobil
+mobilapp
 mobilappen
 mobile
 modellen
@@ -1115,6 +1119,7 @@ referencetidszone
 refereres
 reformationsdagen
 regel
+regelforekomsten
 regelresultatet
 regeltildeling
 regionale
@@ -1195,6 +1200,7 @@ sendt
 senere
 seneste
 separat
+serien
 seriøst
 serveren
 serverens
@@ -1289,6 +1295,8 @@ starttid
 starttidsformat
 starttidspunkt
 starttidspunktet
+startår
+startåret
 statistik
 statshelligdag
 statskode

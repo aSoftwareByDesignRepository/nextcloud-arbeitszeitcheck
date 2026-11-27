@@ -219,6 +219,7 @@ class AdminController extends Controller
 		?\OCA\ArbeitszeitCheck\Service\CalculationProofExportService $calculationProofExportService = null,
 		?\OCA\ArbeitszeitCheck\Service\WorkforcePolicyService $workforcePolicyService = null,
 		?\OCA\ArbeitszeitCheck\Service\YearEndResetService $yearEndResetService = null,
+		?\OCA\ArbeitszeitCheck\Service\HolidayRuleService $holidayRuleService = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->timeEntryMapper = $timeEntryMapper;
@@ -271,7 +272,20 @@ class AdminController extends Controller
 		$this->calculationProofExportService = $calculationProofExportService;
 		$this->workforcePolicyService = $workforcePolicyService;
 		$this->yearEndResetService = $yearEndResetService;
+		$this->holidayRuleService = $holidayRuleService;
 		$this->setCspService($cspService);
+	}
+
+	private ?\OCA\ArbeitszeitCheck\Service\HolidayRuleService $holidayRuleService = null;
+
+	private function holidayRuleService(): \OCA\ArbeitszeitCheck\Service\HolidayRuleService
+	{
+		if ($this->holidayRuleService === null) {
+			$this->holidayRuleService = \OCP\Server::get(
+				\OCA\ArbeitszeitCheck\Service\HolidayRuleService::class
+			);
+		}
+		return $this->holidayRuleService;
 	}
 
 	private ?\OCA\ArbeitszeitCheck\Service\UserWorkingTimeAssignmentService $userWorkingTimeAssignmentService = null;
@@ -2776,6 +2790,10 @@ class AdminController extends Controller
 				'year' => $year,
 				'statutoryAutoReseed' => $this->appConfig->getAppValueString('statutory_auto_reseed', '1') === '1',
 				'holidays' => $dtoList,
+				// B-R7: rules (with skipped years) power the ↻-badges,
+				// skip/stop actions and the shadow-hint in the admin list.
+				'rules' => $this->holidayRuleService()->listForState($state),
+				'skipped_rules' => $this->holidayRuleService()->skippedInstancesForStateYear($state, $year),
 				'period' => [
 					'start' => $start->format('Y-m-d'),
 					'end' => $end->format('Y-m-d'),
@@ -2820,7 +2838,10 @@ class AdminController extends Controller
 				], Http::STATUS_BAD_REQUEST);
 			}
 
-			$suggested = HolidayCatalogResolver::suggestedCompanyHolidaysForRegionAndYear($state, $year);
+			// B-R4: anchor metadata comes from the catalog, never inferred
+			// from date equality (a fixed MM-DD day can coincidentally land
+			// on easter+offset in a given year).
+			$suggested = HolidayCatalogResolver::suggestedCompanyHolidayEntriesForRegionAndYear($state, $year);
 
 			// Existing holidays (any scope) on the same dates, so the UI can
 			// disable "Add" buttons for dates that are already covered.
@@ -2835,14 +2856,30 @@ class AdminController extends Controller
 				}
 			}
 
+			// EC-B9: active rules of the state keyed by rule_key so the UI
+			// can disable "add annually" where a rule already covers the day.
+			$activeRuleKeys = [];
+			foreach ($this->holidayRuleService()->listForState($state) as $rule) {
+				if (!empty($rule['active'])) {
+					$activeRuleKeys[(string)$rule['rule_key']] = true;
+				}
+			}
+
 			$suggestions = [];
 			$country = RegionRegistry::countryOf($state);
-			foreach ($suggested as $date => $msgid) {
+			foreach ($suggested as $date => $entry) {
+				$anchor = $entry['anchor'] ?? ['type' => 'date'];
+				$ruleKey = ($anchor['type'] ?? '') === 'easter'
+					? \OCA\ArbeitszeitCheck\Db\HolidayRule::ruleKeyFor('easter', 0, 0, (int)($anchor['offset'] ?? 0))
+					: \OCA\ArbeitszeitCheck\Db\HolidayRule::ruleKeyFor('date', (int)($anchor['month'] ?? 0), (int)($anchor['day'] ?? 0), 0);
 				$suggestions[] = [
 					'date' => $date,
-					'name' => $this->l10n->t($msgid),
+					'name' => $this->l10n->t($entry['name']),
+					'name_msgid' => $entry['name'],
+					'anchor' => $anchor,
 					'kind' => $this->suggestedCompanyHolidayKind((string)$date, $country),
 					'exists' => isset($existingByDate[$date]),
+					'recurring_exists' => isset($activeRuleKeys[$ruleKey]),
 				];
 			}
 
@@ -2955,6 +2992,69 @@ class AdminController extends Controller
 				], Http::STATUS_CONFLICT);
 			}
 
+			// B-R5: recurring=true stores an annual rule instead of a
+			// single-year row. Rules are company/custom scope only —
+			// statutory days stay exclusively catalog-managed.
+			$recurringParam = $params['recurring'] ?? null;
+			$recurring = $recurringParam === true || $recurringParam === 1
+				|| $recurringParam === '1' || $recurringParam === 'true';
+			if ($recurring && $id > 0) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('An existing single-day entry cannot be updated into an annual rule — use the "Repeat every year" action instead.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+			if ($recurring && $scope === Holiday::SCOPE_STATUTORY) {
+				return new JSONResponse([
+					'success' => false,
+					'error' => $this->l10n->t('Statutory holidays cannot become annual rules.'),
+				], Http::STATUS_BAD_REQUEST);
+			}
+			if ($recurring) {
+				$performedBy = $this->getPerformedBy();
+				// Only pass keys the client actually sent — nulls would
+				// read as explicit values in the service's param map.
+				$ruleParams = [
+					'state' => $state,
+					'date' => $dateObj->format('Y-m-d'),
+					'name' => $name,
+					'kind' => $kind,
+					'scope' => $scope,
+				];
+				foreach (['anchor', 'month', 'day', 'easterOffset', 'easter_offset', 'nameMsgid', 'name_msgid', 'startYear', 'start_year'] as $k) {
+					if (array_key_exists($k, $params) && $params[$k] !== null && $params[$k] !== '') {
+						$ruleParams[$k] = $params[$k];
+					}
+				}
+				try {
+					$rule = $this->holidayRuleService()->createRule($ruleParams, $performedBy);
+				} catch (\OCA\ArbeitszeitCheck\Exception\BusinessRuleException $e) {
+					$status = $e->getReasonCode() === 'holiday_rule_exists' ? Http::STATUS_CONFLICT : Http::STATUS_BAD_REQUEST;
+					return new JSONResponse([
+						'success' => false,
+						'error' => $e->getMessage(),
+						'reason' => $e->getReasonCode(),
+					], $status);
+				}
+
+				$ruleValues = $rule->toArray();
+				$this->auditLogMapper->logAction(
+					$performedBy,
+					'holiday_rule_created',
+					'holiday_rule',
+					$rule->getId(),
+					null,
+					$ruleValues,
+					$performedBy
+				);
+
+				return new JSONResponse([
+					'success' => true,
+					'recurring' => true,
+					'rule' => $ruleValues,
+				]);
+			}
+
 			$holiday = new Holiday();
 			$oldValues = null;
 			if ($id > 0) {
@@ -3014,6 +3114,19 @@ class AdminController extends Controller
 				$performedBy
 			);
 
+			// Shadow-check (B-R5): when an active rule already covers this
+			// date the persisted row wins silently — surface that so the UI
+			// can explain "your entry replaces the rule instance for {year}".
+			$coveringRule = null;
+			try {
+				$rule = $this->holidayRuleService()->ruleCoveringDate($state, $dateObj->format('Y-m-d'));
+				if ($rule !== null) {
+					$coveringRule = ['rule_id' => $rule->getId(), 'name' => $rule->getName()];
+				}
+			} catch (\Throwable) {
+				$coveringRule = null;
+			}
+
 			return new JSONResponse([
 				'success' => true,
 				'holiday' => [
@@ -3025,6 +3138,7 @@ class AdminController extends Controller
 					'scope' => $holiday->getScope(),
 					'source' => $holiday->getSource(),
 				],
+				'covered_by_rule' => $coveringRule,
 			]);
 		} catch (\Throwable $e) {
 			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::saveStateHoliday failed: ' . $e->getMessage(), ['exception' => $e]);
@@ -3104,6 +3218,255 @@ class AdminController extends Controller
 				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
 			], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
+	}
+
+	/**
+	 * Convert an existing single-date holiday row into an annual rule
+	 * (B-R7 "Repeat every year" action) — rule insert + row delete are
+	 * atomic under the named holiday-catalog lock.
+	 *
+	 * @param int $id
+	 */
+	#[NoAdminRequired]
+	public function convertStateHolidayToRule(int $id): JSONResponse
+	{
+		try {
+			$performedBy = $this->getPerformedBy();
+			$rule = $this->holidayRuleService()->convertHolidayToRule($id, $performedBy);
+
+			$this->auditLogMapper->logAction(
+				$performedBy,
+				'state_holiday_converted_to_rule',
+				'holiday_rule',
+				$rule->getId(),
+				null,
+				$rule->toArray(),
+				$performedBy
+			);
+
+			return new JSONResponse(['success' => true, 'rule' => $rule->toArray()]);
+		} catch (\OCA\ArbeitszeitCheck\Exception\BusinessRuleException $e) {
+			return $this->holidayRuleErrorResponse($e);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::convertStateHolidayToRule failed: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Create an annual holiday rule (B-R6). Params mirror the saveStateHoliday
+	 * recurring path: state, name, kind, scope (company|custom), anchor
+	 * ('date' + month/day, or 'easter' + easterOffset), startYear, nameMsgid.
+	 */
+	#[NoAdminRequired]
+	public function createHolidayRule(): JSONResponse
+	{
+		try {
+			$params = $this->request->getParams();
+			if (!is_array($params)) {
+				$params = [];
+			}
+			$performedBy = $this->getPerformedBy();
+			$rule = $this->holidayRuleService()->createRule($params, $performedBy);
+
+			$this->auditLogMapper->logAction(
+				$performedBy,
+				'holiday_rule_created',
+				'holiday_rule',
+				$rule->getId(),
+				null,
+				$rule->toArray(),
+				$performedBy
+			);
+
+			return new JSONResponse(['success' => true, 'rule' => $rule->toArray()]);
+		} catch (\OCA\ArbeitszeitCheck\Exception\BusinessRuleException $e) {
+			return $this->holidayRuleErrorResponse($e);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::createHolidayRule failed: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Edit an annual rule's name/kind/start_year/anchor — applies to every
+	 * year the rule produces (B-R6; the UI explains that edits are global).
+	 *
+	 * @param int $id
+	 */
+	#[NoAdminRequired]
+	public function updateHolidayRule(int $id): JSONResponse
+	{
+		try {
+			$params = $this->request->getParams();
+			if (!is_array($params)) {
+				$params = [];
+			}
+			$performedBy = $this->getPerformedBy();
+			$oldValues = null;
+			try {
+				$oldValues = $this->holidayRuleService()->getRuleForAudit($id);
+			} catch (\Throwable) {
+				$oldValues = null;
+			}
+
+			$rule = $this->holidayRuleService()->updateRule($id, $params, $performedBy);
+
+			$this->auditLogMapper->logAction(
+				$performedBy,
+				'holiday_rule_updated',
+				'holiday_rule',
+				$id,
+				$oldValues,
+				$rule->toArray(),
+				$performedBy
+			);
+
+			return new JSONResponse(['success' => true, 'rule' => $rule->toArray()]);
+		} catch (\OCA\ArbeitszeitCheck\Exception\BusinessRuleException $e) {
+			return $this->holidayRuleErrorResponse($e);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::updateHolidayRule failed: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Per-year exception on a rule ("skip 2027 only", B-R6).
+	 *
+	 * @param int $id
+	 */
+	#[NoAdminRequired]
+	public function addHolidayRuleSkip(int $id): JSONResponse
+	{
+		try {
+			$year = (int)$this->request->getParam('year', 0);
+			$performedBy = $this->getPerformedBy();
+			$this->holidayRuleService()->addSkip($id, $year, $performedBy);
+
+			$this->auditLogMapper->logAction(
+				$performedBy,
+				'holiday_rule_skip_added',
+				'holiday_rule',
+				$id,
+				null,
+				['year' => $year],
+				$performedBy
+			);
+
+			return new JSONResponse(['success' => true]);
+		} catch (\OCA\ArbeitszeitCheck\Exception\BusinessRuleException $e) {
+			return $this->holidayRuleErrorResponse($e);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::addHolidayRuleSkip failed: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Undo a per-year exception — the rule instance reappears for that year.
+	 *
+	 * @param int $id
+	 * @param int $year
+	 */
+	#[NoAdminRequired]
+	public function deleteHolidayRuleSkip(int $id, int $year): JSONResponse
+	{
+		try {
+			$performedBy = $this->getPerformedBy();
+			$this->holidayRuleService()->removeSkip($id, $year);
+
+			$this->auditLogMapper->logAction(
+				$performedBy,
+				'holiday_rule_skip_removed',
+				'holiday_rule',
+				$id,
+				['year' => $year],
+				null,
+				$performedBy
+			);
+
+			return new JSONResponse(['success' => true]);
+		} catch (\OCA\ArbeitszeitCheck\Exception\BusinessRuleException $e) {
+			return $this->holidayRuleErrorResponse($e);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::deleteHolidayRuleSkip failed: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Stop/continue an annual rule (reversible, B-R6).
+	 *
+	 * @param int $id
+	 */
+	#[NoAdminRequired]
+	public function setHolidayRuleActive(int $id): JSONResponse
+	{
+		try {
+			$activeParam = $this->request->getParam('active', null);
+			$active = $activeParam === true || $activeParam === 1 || $activeParam === '1' || $activeParam === 'true';
+			$performedBy = $this->getPerformedBy();
+			$oldValues = null;
+			try {
+				$oldValues = $this->holidayRuleService()->getRuleForAudit($id);
+			} catch (\Throwable) {
+				$oldValues = null;
+			}
+
+			$rule = $this->holidayRuleService()->setActive($id, $active, $performedBy);
+
+			$this->auditLogMapper->logAction(
+				$performedBy,
+				$active ? 'holiday_rule_activated' : 'holiday_rule_deactivated',
+				'holiday_rule',
+				$id,
+				$oldValues,
+				$rule->toArray(),
+				$performedBy
+			);
+
+			return new JSONResponse(['success' => true, 'rule' => $rule->toArray()]);
+		} catch (\OCA\ArbeitszeitCheck\Exception\BusinessRuleException $e) {
+			return $this->holidayRuleErrorResponse($e);
+		} catch (\Throwable $e) {
+			\OCP\Log\logger('arbeitszeitcheck')->error('AdminController::setHolidayRuleActive failed: ' . $e->getMessage(), ['exception' => $e]);
+			return new JSONResponse([
+				'success' => false,
+				'error' => $this->l10n->t('An unexpected error occurred. Please try again. If the problem continues, contact your administrator.'),
+			], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	private function holidayRuleErrorResponse(\OCA\ArbeitszeitCheck\Exception\BusinessRuleException $e): JSONResponse
+	{
+		$code = $e->getReasonCode() ?? '';
+		$status = match (true) {
+			$code === 'holiday_rule_exists' => Http::STATUS_CONFLICT,
+			$code === 'holiday_rule_not_found', $code === 'holiday_not_found' => Http::STATUS_NOT_FOUND,
+			$code === 'locked' => Http::STATUS_CONFLICT,
+			default => Http::STATUS_BAD_REQUEST,
+		};
+		return new JSONResponse([
+			'success' => false,
+			'error' => $e->getMessage(),
+			'reason' => $code !== '' ? $code : null,
+		], $status);
 	}
 
 	/**

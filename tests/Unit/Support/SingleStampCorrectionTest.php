@@ -104,12 +104,22 @@ class SingleStampCorrectionTest extends TestCase
 	public function testBreaksNormalizedOnSameDay(): void
 	{
 		$result = TimeEntryClockPayloadBuilder::buildPartialFromParams(
-			['date' => '2026-10-28', 'endTime' => '17:30', 'breaks' => [['start' => '12:00', 'end' => '12:30'], ['start' => 'x', 'end' => 'y']]],
+			['date' => '2026-10-28', 'endTime' => '17:30', 'breaks' => [['start' => '12:00', 'end' => '12:30']]],
 			15,
 			new \DateTime('2026-10-28 08:00:00'),
 		);
 		$this->assertCount(1, $result['breaks']);
 		$this->assertSame('2026-10-28T12:00:00+01:00', $result['breaks'][0]['start']);
+	}
+
+	public function testMalformedBreakElementThrows(): void
+	{
+		$this->expectException(\InvalidArgumentException::class);
+		TimeEntryClockPayloadBuilder::buildPartialFromParams(
+			['date' => '2026-10-28', 'endTime' => '17:30', 'breaks' => [['start' => '12:00', 'end' => '12:30'], ['start' => 'x', 'end' => 'y']]],
+			15,
+			new \DateTime('2026-10-28 08:00:00'),
+		);
 	}
 
 	public function testEndedReasonConstantDistinct(): void

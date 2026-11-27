@@ -64,6 +64,36 @@
         return (window.ArbeitszeitCheck && window.ArbeitszeitCheck.catConfig) || { colors: [], icons: [], locales: [] };
     }
 
+    /**
+     * "Counts as paid" has no effect while BOTH org credit gates are off
+     * (A-R4; OR semantics — either gate open makes the flag live). Pure so
+     * Vitest can pin the matrix; DOM wiring re-derives the paid-flag count
+     * from the rendered rows (`data-soll-credit`) after mutations reload.
+     *
+     * @param {{leaveSollEffectsEnabled?: boolean, paidAbsenceCreditEnabled?: boolean}} flags
+     * @param {number} sollCreditTypeCount
+     * @returns {boolean}
+     */
+    function paidGateWarningVisible(flags, sollCreditTypeCount) {
+        const cfg = flags || {};
+        return (sollCreditTypeCount | 0) > 0
+            && cfg.leaveSollEffectsEnabled !== true
+            && cfg.paidAbsenceCreditEnabled !== true;
+    }
+
+    function refreshPaidGateWarning() {
+        const warning = document.getElementById('cat-paid-gate-warning');
+        if (!warning) {
+            return;
+        }
+        const cfg = catConfig();
+        const paidCount = document.querySelectorAll('#cat-tbody tr[data-soll-credit="1"]').length;
+        warning.hidden = !paidGateWarningVisible({
+            leaveSollEffectsEnabled: cfg.leaveSollEffectsEnabled === true,
+            paidAbsenceCreditEnabled: cfg.paidAbsenceCreditEnabled === true,
+        }, paidCount);
+    }
+
     function optionList(values, selected) {
         return (values || []).map(function(v) {
             const sel = v === selected ? ' selected' : '';
@@ -409,6 +439,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+        refreshPaidGateWarning();
         const createBtn = document.getElementById('cat-create');
         if (createBtn) {
             createBtn.addEventListener('click', function() {
@@ -436,4 +467,12 @@
             });
         }
     });
+
+    // Test surface for Vitest (pure decision helpers only).
+    if (typeof window !== 'undefined') {
+        window.__ArbeitszeitCheckAdminAbsenceTypesTestables = {
+            paidGateWarningVisible: paidGateWarningVisible,
+            refreshPaidGateWarning: refreshPaidGateWarning,
+        };
+    }
 })();

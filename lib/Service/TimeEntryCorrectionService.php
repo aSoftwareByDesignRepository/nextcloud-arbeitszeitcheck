@@ -321,7 +321,7 @@ class TimeEntryCorrectionService
 	private function storageDateTime(string $value): \DateTime
 	{
 		$tz = AppLocalNaiveDateTimeNormalizer::appStorageTimeZoneFromConfig($this->config);
-		return AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($value, $tz);
+		return AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($value, $tz); // unguarded-parse:ok — documented @throws to guarded callers
 	}
 
 	/**

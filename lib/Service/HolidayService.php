@@ -17,6 +17,9 @@ namespace OCA\ArbeitszeitCheck\Service;
 
 use OCA\ArbeitszeitCheck\Db\Holiday;
 use OCA\ArbeitszeitCheck\Db\HolidayMapper;
+use OCA\ArbeitszeitCheck\Db\HolidayRule;
+use OCA\ArbeitszeitCheck\Db\HolidayRuleMapper;
+use OCA\ArbeitszeitCheck\Db\HolidayRuleSkipMapper;
 use OCA\ArbeitszeitCheck\Db\HolidaySuppressionMapper;
 use OCA\ArbeitszeitCheck\Db\UserSettingsMapper;
 use OCA\ArbeitszeitCheck\Support\HolidayCatalogResolver;
@@ -37,6 +40,8 @@ class HolidayService
 	public function __construct(
 		private readonly HolidayMapper $holidayMapper,
 		private readonly HolidaySuppressionMapper $suppressionMapper,
+		private readonly HolidayRuleMapper $holidayRuleMapper,
+		private readonly HolidayRuleSkipMapper $holidayRuleSkipMapper,
 		private readonly UserSettingsMapper $userSettingsMapper,
 		private readonly IConfig $config,
 		ICacheFactory $cacheFactory,
@@ -85,6 +90,23 @@ class HolidayService
 		$memoKey = $this->requestMemoKey($state, $year);
 		unset($this->entitiesByStateYear[$memoKey], $this->reconciledStateYears[$memoKey]);
 		$this->clearDistributedCacheForStateYear($state, $year);
+	}
+
+	/**
+	 * Flush the request memo for EVERY year of a state (B-R3): a rule edit
+	 * affects all years ≥ start_year, so single-year invalidation would
+	 * leave stale merged lists behind for adjacent years in the same
+	 * request. reconciledStateYears is untouched on purpose — statutory
+	 * reseed tracking does not involve company/custom rules.
+	 */
+	public function resetMemoForState(string $state): void
+	{
+		$prefix = $this->normalizeState($state) . '|';
+		foreach (array_keys($this->entitiesByStateYear) as $key) {
+			if (str_starts_with($key, $prefix)) {
+				unset($this->entitiesByStateYear[$key]);
+			}
+		}
 	}
 
 	/**
@@ -309,7 +331,10 @@ class HolidayService
 		if (!$statutoryAutoReseed && $this->cache !== null) {
 			$cached = $this->cache->get($cacheKey);
 			if (is_array($cached)) {
-				$entities = $this->hydrateFromArray($cached);
+				// B-R3: the distributed cache serializes persisted rows only —
+				// rule instances are merged per-request after hydration and
+				// must never enter the cached payload.
+				$entities = $this->mergeRuleInstances($state, $year, $this->hydrateFromArray($cached));
 				$this->entitiesByStateYear[$memoKey] = $entities;
 
 				return $entities;
@@ -327,7 +352,66 @@ class HolidayService
 			}, $entities));
 		}
 
-		$this->entitiesByStateYear[$memoKey] = $entities;
+		$this->entitiesByStateYear[$memoKey] = $this->mergeRuleInstances($state, $year, $entities);
+
+		return $this->entitiesByStateYear[$memoKey];
+	}
+
+	/**
+	 * Read-time merge of recurring holiday rules (B-R2): every active rule
+	 * of the state that resolves to a date in $year — not skipped, not
+	 * shadowed by a persisted row on the same date — yields a synthesized
+	 * Holiday entity (id=null, source='rule'). Persisted rows always win:
+	 * an explicit manual/statutory row on the resolved date suppresses the
+	 * rule instance for that year (EC-B2, EC-B11), and between rules the
+	 * lowest id wins a shared date.
+	 *
+	 * @param Holiday[] $entities persisted rows (may be cache-hydrated)
+	 * @return Holiday[] rows plus synthesized rule instances
+	 */
+	private function mergeRuleInstances(string $state, int $year, array $entities): array
+	{
+		$rules = $this->holidayRuleMapper->findActiveByState($state);
+		if ($rules === []) {
+			return $entities;
+		}
+		$ruleIds = array_map(static fn (HolidayRule $r): int => (int)$r->getId(), $rules);
+		$skipped = $this->holidayRuleSkipMapper->yearsForRuleIds($ruleIds);
+
+		$covered = [];
+		foreach ($entities as $h) {
+			$d = $h->getDate();
+			if ($d !== null) {
+				$covered[$d->format('Y-m-d')] = true;
+			}
+		}
+
+		foreach ($rules as $rule) {
+			$ruleId = (int)$rule->getId();
+			if (in_array($year, $skipped[$ruleId] ?? [], true)) {
+				continue;
+			}
+			$resolved = $rule->resolveDateForYear($year);
+			if ($resolved === null) {
+				continue;
+			}
+			$ymd = $resolved->format('Y-m-d');
+			if (isset($covered[$ymd])) {
+				continue;
+			}
+			$covered[$ymd] = true;
+
+			$instance = new Holiday();
+			$instance->setState($state);
+			$instance->setDate(\DateTime::createFromImmutable($resolved));
+			$instance->setName((string)$rule->getName());
+			$instance->setKind($rule->getKind() === Holiday::KIND_HALF ? Holiday::KIND_HALF : Holiday::KIND_FULL);
+			$instance->setScope($rule->getScope());
+			$instance->setSource(Holiday::SOURCE_RULE);
+			$instance->setRuleId($ruleId);
+			$instance->setRuleNameMsgid($rule->getNameMsgid());
+			$entities[] = $instance;
+		}
 
 		return $entities;
 	}
@@ -620,6 +704,11 @@ class HolidayService
 		$name = $holiday->getName();
 		if ($holiday->getScope() === Holiday::SCOPE_STATUTORY) {
 			$name = $this->l10n->t($name);
+		} elseif ($holiday->getSource() === Holiday::SOURCE_RULE
+			&& $holiday->getRuleNameMsgid() !== null && $holiday->getRuleNameMsgid() !== '') {
+			// EC-B12: catalog-sourced rule names translate like statutory days;
+			// free-text rule names stay raw.
+			$name = $this->l10n->t($holiday->getRuleNameMsgid());
 		}
 
 		return [
@@ -631,6 +720,10 @@ class HolidayService
 			'scope' => $holiday->getScope(),
 			'source' => $holiday->getSource(),
 			'weight' => $weight,
+			// B-R8 additive keys: rule instances carry their rule id and no
+			// row id; persisted rows report recurring=false/rule_id=null.
+			'recurring' => $holiday->getSource() === Holiday::SOURCE_RULE,
+			'rule_id' => $holiday->getRuleId(),
 		];
 	}
 

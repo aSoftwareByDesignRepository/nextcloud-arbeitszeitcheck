@@ -300,14 +300,34 @@ final class SwissStatutoryHolidayCatalog implements HolidayCatalogInterface
 	 */
 	public static function getSuggestedCompanyHolidaysForRegionAndYear(string $region, int $year): array
 	{
+		$out = [];
+		foreach (self::getSuggestedCompanyHolidayEntriesForRegionAndYear($region, $year) as $date => $entry) {
+			$out[$date] = $entry['name'];
+		}
+		return $out;
+	}
+
+	/**
+	 * Structured suggestion entries with rule anchors (B-R4).
+	 *
+	 * @return array<string, array{name: string, anchor: array{type: string, month?: int, day?: int, offset?: int}}>
+	 */
+	public static function getSuggestedCompanyHolidayEntriesForRegionAndYear(string $region, int $year): array
+	{
 		$region = strtoupper(trim($region));
 		if (!isset(RegionRegistry::regionsForCountry(RegionRegistry::COUNTRY_CH)[$region])) {
 			return [];
 		}
 
 		return [
-			sprintf('%04d-12-24', $year) => 'Christmas Eve',
-			sprintf('%04d-12-31', $year) => 'New Year\'s Eve',
+			sprintf('%04d-12-24', $year) => [
+				'name' => 'Christmas Eve',
+				'anchor' => ['type' => 'date', 'month' => 12, 'day' => 24],
+			],
+			sprintf('%04d-12-31', $year) => [
+				'name' => 'New Year\'s Eve',
+				'anchor' => ['type' => 'date', 'month' => 12, 'day' => 31],
+			],
 		];
 	}
 

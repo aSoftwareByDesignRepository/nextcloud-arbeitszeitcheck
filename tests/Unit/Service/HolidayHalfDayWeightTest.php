@@ -59,12 +59,29 @@ class HolidayHalfDayWeightTest extends TestCase
 		$this->service = new HolidayService(
 			$this->holidayMapper,
 			$suppressionMapper,
+			$this->noRules(),
+			$this->noRuleSkips(),
 			$this->userSettings,
 			$config,
 			$cacheFactory,
 			$l10n,
 			$this->createMock(LoggerInterface::class),
 		);
+	}
+
+	private function noRules(): \OCA\ArbeitszeitCheck\Db\HolidayRuleMapper
+	{
+		$mapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\HolidayRuleMapper::class);
+		$mapper->method('findActiveByState')->willReturn([]);
+		$mapper->method('findByState')->willReturn([]);
+		return $mapper;
+	}
+
+	private function noRuleSkips(): \OCA\ArbeitszeitCheck\Db\HolidayRuleSkipMapper
+	{
+		$mapper = $this->createMock(\OCA\ArbeitszeitCheck\Db\HolidayRuleSkipMapper::class);
+		$mapper->method('yearsForRuleIds')->willReturn([]);
+		return $mapper;
 	}
 
 	public function testStatutoryHalfDayKeepsHalfWeightInRangeDto(): void
@@ -196,6 +213,8 @@ class HolidayHalfDayWeightTest extends TestCase
 		$service = new HolidayService(
 			$this->holidayMapper,
 			$this->createMock(HolidaySuppressionMapper::class),
+			$this->noRules(),
+			$this->noRuleSkips(),
 			$this->userSettings,
 			$config,
 			$cacheFactory,

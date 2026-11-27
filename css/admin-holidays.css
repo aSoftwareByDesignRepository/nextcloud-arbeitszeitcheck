@@ -157,6 +157,52 @@
 	}
 }
 
+/* ===== RECURRING RULES (annual company/custom days) ===== */
+#app-content.azc-app--admin-holidays .admin-holidays__editor-extras > td {
+	padding-top: 0;
+	border-top: 0;
+}
+
+#app-content.azc-app--admin-holidays .admin-holidays__repeat-controls {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--azc-space-3, 0.75rem);
+	padding: var(--azc-space-1, 0.25rem) 0;
+}
+
+#app-content.azc-app--admin-holidays .admin-holidays__repeat-controls .form-checkbox {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--azc-space-2, 0.5rem);
+	min-height: 44px;
+}
+
+#app-content.azc-app--admin-holidays .admin-holidays__repeat-controls .form-label {
+	margin: 0;
+}
+
+#app-content.azc-app--admin-holidays .admin-holidays__repeat-controls .form-select {
+	min-height: 44px;
+	max-width: 16rem;
+}
+
+/* Synthesized rule instance (EC-B13): italic name + ↻ badge conveys "from a
+   rule", not a persisted row. */
+#app-content.azc-app--admin-holidays .admin-holidays-row--rule td:first-child {
+	font-style: italic;
+}
+
+/* Skipped instance: muted but readable (WCAG contrast — only opacity on the
+   row container, badge keeps full tint). */
+#app-content.azc-app--admin-holidays .admin-holidays-row--skipped td {
+	opacity: 0.55;
+}
+
+#app-content.azc-app--admin-holidays .admin-holidays-row--skipped td.actions-cell {
+	opacity: 1;
+}
+
 /* ===== COMMON ADDITIONAL HOLIDAYS (SUGGESTIONS) ===== */
 #app-content.azc-app--admin-holidays .admin-holidays__suggestions {
 	margin-top: var(--space-5, 1.25rem);

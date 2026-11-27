@@ -1034,10 +1034,24 @@ class Application extends App implements IBootstrap {
 			);
 		});
 
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\HolidayRuleMapper::class, function($c) {
+			return new \OCA\ArbeitszeitCheck\Db\HolidayRuleMapper(
+				$c->query(\OCP\IDBConnection::class)
+			);
+		});
+
+		$context->registerService(\OCA\ArbeitszeitCheck\Db\HolidayRuleSkipMapper::class, function($c) {
+			return new \OCA\ArbeitszeitCheck\Db\HolidayRuleSkipMapper(
+				$c->query(\OCP\IDBConnection::class)
+			);
+		});
+
 		$context->registerService(HolidayService::class, function($c) {
 			return new HolidayService(
 				$c->query(\OCA\ArbeitszeitCheck\Db\HolidayMapper::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\HolidaySuppressionMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\HolidayRuleMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\HolidayRuleSkipMapper::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\UserSettingsMapper::class),
 				$c->query(\OCP\IConfig::class),
 				$c->query(\OCP\ICacheFactory::class),
@@ -1047,10 +1061,22 @@ class Application extends App implements IBootstrap {
 			);
 		});
 
+		$context->registerService(\OCA\ArbeitszeitCheck\Service\HolidayRuleService::class, function($c) {
+			return new \OCA\ArbeitszeitCheck\Service\HolidayRuleService(
+				$c->query(\OCA\ArbeitszeitCheck\Db\HolidayRuleMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\HolidayRuleSkipMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\HolidayMapper::class),
+				$c->query(HolidayService::class),
+				$c->query(\OCP\Lock\ILockingProvider::class),
+			);
+		});
+
 		$context->registerService(\OCA\ArbeitszeitCheck\Service\HolidayAdminService::class, function($c) {
 			return new \OCA\ArbeitszeitCheck\Service\HolidayAdminService(
 				$c->query(\OCA\ArbeitszeitCheck\Db\HolidayMapper::class),
 				$c->query(\OCA\ArbeitszeitCheck\Db\HolidaySuppressionMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\HolidayRuleMapper::class),
+				$c->query(\OCA\ArbeitszeitCheck\Db\HolidayRuleSkipMapper::class),
 				$c->query(HolidayService::class),
 				$c->query(\OCP\IConfig::class),
 				$c->query(\OCP\Lock\ILockingProvider::class),

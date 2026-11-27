@@ -51,9 +51,36 @@ class AbsenceTypeAdminController extends Controller
 		private readonly PermissionService $permissionService,
 		private readonly LocaleFormatService $localeFormat,
 		CSPService $cspService,
+		private readonly ?\OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService $paidAbsenceCreditService = null,
 	) {
 		parent::__construct($appName, $request);
 		$this->setCspService($cspService);
+	}
+
+	/**
+	 * Both paid-absence credit gates — the "Counts as paid absence" flag on
+	 * custom types only credits while at least one is open (OR semantics).
+	 * Resolved lazily so legacy constructions without the service still work.
+	 *
+	 * @return array{leaveSollEffectsEnabled: bool, paidAbsenceCreditEnabled: bool}
+	 */
+	private function paidCreditGateFlags(): array
+	{
+		$service = $this->paidAbsenceCreditService;
+		if ($service === null) {
+			try {
+				$service = \OCP\Server::get(\OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService::class);
+			} catch (\Throwable) {
+				$service = null;
+			}
+		}
+		if ($service === null) {
+			return ['leaveSollEffectsEnabled' => true, 'paidAbsenceCreditEnabled' => false];
+		}
+		return [
+			'leaveSollEffectsEnabled' => $service->isLeaveEffectsEnabled(),
+			'paidAbsenceCreditEnabled' => $service->isEnabled(),
+		];
 	}
 
 	/** @return array{showSubstitutionLink: bool, showManagerLink: bool, showReportsLink: bool, showAdminNav: bool} */
@@ -99,7 +126,8 @@ class AbsenceTypeAdminController extends Controller
 				'localeOptions' => \OCA\ArbeitszeitCheck\Service\OutlookIcalSubscriptionLanguageCatalog::optionsForUi(),
 				'urlGenerator' => $this->urlGenerator,
 				'l' => $this->l10n,
-			],
+				'overtimeSettingsUrl' => $this->urlGenerator->linkToRoute('arbeitszeitcheck.admin.overtimeSettings'),
+			] + $this->paidCreditGateFlags(),
 		));
 		return $this->configureCSP($response, 'admin');
 	}

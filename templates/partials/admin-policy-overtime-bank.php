@@ -113,7 +113,7 @@ declare(strict_types=1);
 								</label>
 							</div>
 							<p id="leaveSollEffectsEnabled-help" class="form-help">
-								<?php p($l->t('On by default. Approved vacation, personal and special leave credit their planned net hours like worked time — a vacation day can no longer create minus hours. Unpaid and parental leave remove the day\'s target instead, so they stay neutral without inventing paid hours. Applies to open (unsealed) periods and recalculates the live balance.')); ?>
+								<?php p($l->t('On by default. Approved vacation, personal and special leave credit their planned net hours like worked time — a vacation day can no longer create minus hours. Custom absence types marked "Counts as paid absence" are covered by this setting too. Unpaid and parental leave remove the day\'s target instead, so they stay neutral without inventing paid hours. Applies to open (unsealed) periods and recalculates the live balance.')); ?>
 							</p>
 						</div>
 						<div class="form-group">
@@ -129,7 +129,7 @@ declare(strict_types=1);
 								</label>
 							</div>
 							<p id="paidAbsencePlannedHoursCreditEnabled-help" class="form-help">
-								<?php p($l->t('When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation and other leave types are handled by the leave-rules setting above.')); ?>
+								<?php p($l->t('When enabled, approved sick leave credits the planned net hours for that day into the overtime balance (weekday schedule or duty roster, including planned Saturday/Sunday shifts). Free weekends stay at 0. Enabling recalculates the live balance for past sick days in open periods — confirm this matches your Betriebsvereinbarung or Tarifvertrag. Unpaid leave is never credited. Vacation, leave and custom types marked "Counts as paid absence" are handled by the leave-rules setting above — this option governs the sick-leave family only.')); ?>
 							</p>
 						</div>
 					</div>

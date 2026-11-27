@@ -25,6 +25,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - custom absence types normalized into the HR notification matrix (fail-closed send)
 - earliest_counted_start clamp resolved through the entity counted API; web + mobile
   show "Counted from" when the clamp moved the counted start (accounting-only)
+- custom "Counts as paid absence" types credit planned hours when EITHER the sick
+  opt-in or the leave Soll-effects gate is on (OR-gate) — a paid-leave custom type
+  no longer silently ignores the leave gate; breakdown explains gate-disabled items
+  with the concrete setting to open (`gate` field) and flags unpaid custom types
+  via `type_not_paid` on web + companion (spec customer-requests-2026-11-27)
+- special leave entitlements get a "Counts as paid leave" checkbox that writes
+  through to the linked absence type; the absence-types admin warns inline when
+  paid types exist while both credit gates are off, with a deep link to settings
+- recurring company-holiday rules per state (`at_holiday_rules` +
+  `at_holiday_rule_skips`): fixed-date and Easter-offset anchors, optional start
+  year, per-year skip/restore, stop-series, year-vs-series delete dialog, and
+  convert-an-existing-holiday-to-a-rule (single atomic endpoint). Rules merge at
+  read time — persisted rows always win, lowest rule id wins rule-vs-rule,
+  Feb 29 yields no instance on non-leap years; holiday suggestions offer
+  "Add annually" with `anchor` + `recurring_exists` metadata (admin UI + API)
 
 ### Fixed
 

@@ -260,7 +260,7 @@ final class TimeZoneService
 	 */
 	public function parseClientDateTime(string $value): \DateTime
 	{
-		return AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($value, $this->storageTimeZone());
+		return AppLocalNaiveDateTimeNormalizer::parseFlexibleDateTime($value, $this->storageTimeZone()); // unguarded-parse:ok — documented @throws to guarded callers
 	}
 
 	/**

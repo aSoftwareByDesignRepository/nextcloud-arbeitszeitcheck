@@ -145,6 +145,13 @@ $enabled = !empty($_['specialEntitlementsEnabled']);
 						<p id="se-absenceTypeCode-error" class="azc-field-error" hidden></p>
 					</div>
 					<div class="form-group">
+						<div class="form-checkbox">
+							<input type="checkbox" id="se-paid-leave" name="paidLeave" value="1" checked aria-describedby="se-paid-leave-help">
+							<label for="se-paid-leave" class="form-label"><?php p($l->t('Paid leave')); ?></label>
+						</div>
+						<p id="se-paid-leave-help" class="form-help"><?php p($l->t('On by default — entitlement days are granted paid days off, so planned hours credit the working-time account like vacation. Turn off for an unpaid special leave; for a general unpaid variant use the built-in "Unpaid leave" absence type.')); ?></p>
+					</div>
+					<div class="form-group">
 						<label for="se-priority" class="form-label"><?php p($l->t('Priority')); ?></label>
 						<input id="se-priority" name="priority" type="number" min="-1000" max="1000" value="0" aria-describedby="se-priority-error">
 						<p id="se-priority-error" class="azc-field-error" hidden></p>
@@ -193,6 +200,14 @@ $enabled = !empty($_['specialEntitlementsEnabled']);
 						<button id="se-conflict-reload" class="azc-btn azc-btn--secondary" type="button"><?php p($l->t('Load current data')); ?></button>
 					</div>
 				</div>
+			</div>
+			<div class="form-group se-detail__paid">
+				<div class="form-checkbox">
+					<input type="checkbox" id="se-detail-paid" aria-describedby="se-detail-paid-help">
+					<label for="se-detail-paid" class="form-label"><?php p($l->t('Paid leave')); ?></label>
+				</div>
+				<p id="se-detail-paid-help" class="form-help"><?php p($l->t('Paid entitlement days credit planned hours to the working-time account like vacation. Applies to the linked absence type.')); ?></p>
+				<p id="se-detail-paid-status" class="form-help" role="status" aria-live="polite"></p>
 			</div>
 			<h3><?php p($l->t('Rules')); ?></h3>
 			<p class="form-help form-help--block"><?php p($l->t('Rules define who gets this entitlement and how much — for example, a different amount per team or person. You can set up more than one rule to treat different groups of people.')); ?></p>

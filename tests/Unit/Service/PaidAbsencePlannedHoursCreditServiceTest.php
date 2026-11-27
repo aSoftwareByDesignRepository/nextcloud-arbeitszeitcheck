@@ -12,6 +12,7 @@ namespace OCA\ArbeitszeitCheck\Tests\Unit\Service;
 use OCA\ArbeitszeitCheck\Constants;
 use OCA\ArbeitszeitCheck\Db\Absence;
 use OCA\ArbeitszeitCheck\Db\AbsenceMapper;
+use OCA\ArbeitszeitCheck\Db\CustomAbsenceType;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModel;
 use OCA\ArbeitszeitCheck\Db\UserWorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Db\WorkingTimeModel;
@@ -19,6 +20,7 @@ use OCA\ArbeitszeitCheck\Db\WorkingTimeModelMapper;
 use OCA\ArbeitszeitCheck\Service\DutyRotationSollProvider;
 use OCA\ArbeitszeitCheck\Service\HolidayService;
 use OCA\ArbeitszeitCheck\Service\PaidAbsencePlannedHoursCreditService;
+use OCA\ArbeitszeitCheck\Support\AbsenceTypeCatalog;
 use OCA\ArbeitszeitCheck\Support\WeekdaySchedule;
 use OCP\IConfig;
 use PHPUnit\Framework\TestCase;
@@ -48,6 +50,12 @@ class PaidAbsencePlannedHoursCreditServiceTest extends TestCase
 		$this->holidayService = $this->createMock(HolidayService::class);
 		$this->holidayService->method('getHolidayWeightForUser')->willReturn(0.0);
 		$this->rotation = $this->createMock(DutyRotationSollProvider::class);
+	}
+
+	protected function tearDown(): void
+	{
+		AbsenceTypeCatalog::resetCustomTypeCache();
+		parent::tearDown();
 	}
 
 	private function service(): PaidAbsencePlannedHoursCreditService
@@ -888,5 +896,113 @@ class PaidAbsencePlannedHoursCreditServiceTest extends TestCase
 
 		$this->assertEqualsWithDelta(7.8, $result['hours'], 0.001);
 		$this->assertSame(1, $result['days_credited']);
+	}
+
+	// ---------------------------------------------------------------
+	// A-R1: custom `soll_credit` types credit under an OR of both gates —
+	// the paid flag is explicit admin intent (customer requests 2026-11).
+	// ---------------------------------------------------------------
+
+	/**
+	 * Inject a custom-type row into the catalog's request-scoped static
+	 * cache — the same reflection seam {@see AbsenceCustomMaxDaysDebitTest}
+	 * uses; {@see AbsenceTypeCatalog::customTypes()} never touches a DB here.
+	 */
+	private function withCustomType(string $code, bool $sollCredit): void
+	{
+		$custom = new CustomAbsenceType();
+		$custom->setCode($code);
+		$custom->setSollCredit($sollCredit);
+		$custom->setActive(true);
+		$custom->setMaxDays(365);
+		foreach (['customLoaded' => true, 'customCache' => [$code => $custom]] as $prop => $val) {
+			$p = new \ReflectionProperty(AbsenceTypeCatalog::class, $prop);
+			$p->setValue(null, $val);
+		}
+	}
+
+	public function testCustomSollCreditTypeCreditsWhenOnlySickGateOn(): void
+	{
+		// The customer case: sick opt-in ON, leave effects OFF — a paid-leave
+		// custom type must still credit (OR-gate leg 1).
+		$this->flags('1', '0');
+		$this->withCustomType('custom_religious', true);
+		$this->rotation->method('isEnabledForOrg')->willReturn(true);
+		$this->rotation->method('dayNetHoursForUser')->willReturn(8.0);
+
+		$this->absenceMapper->method('findByUserAndDateRange')->willReturn([
+			$this->approvedAbsence('custom_religious', '2026-09-09', '2026-09-09', 1.0),
+		]);
+
+		$result = $this->service()->creditHoursForRange(
+			'alice',
+			new \DateTime('2026-09-09'),
+			new \DateTime('2026-09-09'),
+		);
+
+		$this->assertEqualsWithDelta(8.0, $result['hours'], 0.001);
+		$this->assertSame(1, $result['days_credited']);
+	}
+
+	public function testCustomSollCreditTypeCreditsWhenOnlyLeaveGateOn(): void
+	{
+		// OR-gate leg 2: leave effects ON alone also opens the paid-leave
+		// custom type — and proves the aggregate path runs at all with the
+		// sick opt-in off (the top-level check is an OR too).
+		$this->flags('0', '1');
+		$this->withCustomType('custom_religious', true);
+		$this->rotation->method('isEnabledForOrg')->willReturn(true);
+		$this->rotation->method('dayNetHoursForUser')->willReturn(8.0);
+
+		$this->absenceMapper->method('findByUserAndDateRange')->willReturn([
+			$this->approvedAbsence('custom_religious', '2026-09-09', '2026-09-09', 1.0),
+		]);
+
+		$result = $this->service()->creditHoursForRange(
+			'alice',
+			new \DateTime('2026-09-09'),
+			new \DateTime('2026-09-09'),
+		);
+
+		$this->assertEqualsWithDelta(8.0, $result['hours'], 0.001);
+		$this->assertSame(1, $result['days_credited']);
+	}
+
+	public function testCustomSollCreditTypeBlockedWhenBothGatesOff(): void
+	{
+		$this->flags('0', '0');
+		$this->withCustomType('custom_religious', true);
+		$this->absenceMapper->expects($this->never())->method('findByUserAndDateRange');
+
+		$result = $this->service()->creditHoursForRange(
+			'alice',
+			new \DateTime('2026-09-09'),
+			new \DateTime('2026-09-09'),
+		);
+
+		$this->assertSame(0.0, $result['hours']);
+	}
+
+	public function testCustomTypeWithoutPaidFlagNeverCredits(): void
+	{
+		// Even with both gates open, a custom type without `soll_credit`
+		// is worked/neutral time (type_not_paid) — no credit, no reduction.
+		$this->flags('1', '1');
+		$this->withCustomType('custom_training', false);
+		$this->rotation->method('isEnabledForOrg')->willReturn(true);
+		$this->rotation->method('dayNetHoursForUser')->willReturn(8.0);
+
+		$this->absenceMapper->method('findByUserAndDateRange')->willReturn([
+			$this->approvedAbsence('custom_training', '2026-09-09', '2026-09-09', 1.0),
+		]);
+
+		$result = $this->service()->creditHoursForRange(
+			'alice',
+			new \DateTime('2026-09-09'),
+			new \DateTime('2026-09-09'),
+		);
+
+		$this->assertSame(0.0, $result['hours']);
+		$this->assertSame(0, $result['days_credited']);
 	}
 }

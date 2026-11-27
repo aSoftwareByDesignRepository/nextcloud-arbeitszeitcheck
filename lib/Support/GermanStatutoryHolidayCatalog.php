@@ -78,6 +78,16 @@ final class GermanStatutoryHolidayCatalog implements HolidayCatalogInterface
 	}
 
 	/**
+	 * Structured suggestion entries with rule anchors (B-R4) — none for DE.
+	 *
+	 * @return array<string, array{name: string, anchor: array{type: string, month?: int, day?: int, offset?: int}}>
+	 */
+	public static function getSuggestedCompanyHolidayEntriesForRegionAndYear(string $region, int $year): array
+	{
+		return [];
+	}
+
+	/**
 	 * @return array<string,string> date (Y-m-d) => English name (l10n msgid)
 	 */
 	public static function getStatutoryHolidaysForStateAndYear(string $state, int $year): array

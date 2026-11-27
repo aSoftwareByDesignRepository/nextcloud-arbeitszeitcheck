@@ -50,6 +50,11 @@ class Holiday extends Entity
 
 	public const SOURCE_GENERATED = 'generated';
 	public const SOURCE_MANUAL = 'manual';
+	/**
+	 * Read-time instance synthesized from an at_holiday_rules row — never
+	 * persisted (id stays null, source='rule' marks it in DTOs/lists).
+	 */
+	public const SOURCE_RULE = 'rule';
 
 	/** @var string */
 	protected $state;
@@ -74,6 +79,43 @@ class Holiday extends Entity
 
 	/** @var \DateTime */
 	protected $updatedAt;
+
+	/**
+	 * Transient, never persisted: set on read-time rule instances only.
+	 * Not registered via addType so QBMapper ignores it on insert/update
+	 * and hydration — a 'rule' entity can never reach at_holidays rows.
+	 *
+	 * @var int|null
+	 */
+	protected $ruleId = null;
+
+	/**
+	 * Transient, never persisted: catalog msgid of the underlying rule —
+	 * buildHolidayDto translates it like a statutory name (EC-B12).
+	 *
+	 * @var string|null
+	 */
+	protected $ruleNameMsgid = null;
+
+	public function getRuleId(): ?int
+	{
+		return $this->ruleId;
+	}
+
+	public function setRuleId(?int $ruleId): void
+	{
+		$this->ruleId = $ruleId;
+	}
+
+	public function getRuleNameMsgid(): ?string
+	{
+		return $this->ruleNameMsgid;
+	}
+
+	public function setRuleNameMsgid(?string $ruleNameMsgid): void
+	{
+		$this->ruleNameMsgid = $ruleNameMsgid;
+	}
 
 	public function __construct()
 	{

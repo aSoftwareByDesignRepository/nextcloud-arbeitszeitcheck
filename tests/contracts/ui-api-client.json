@@ -1404,6 +1404,115 @@
      ]
     }
    ]
+  },
+  {
+   "id": "admin-holiday-rules",
+   "param": "recurring / anchor / easterOffset / start_year / year / active",
+   "description": "Recurring annual holiday rules (B-R5/R6/R7): POST /api/admin/holiday-rules creates a rule (state, name, kind, scope, anchor='date'+date or 'easter'+easterOffset, start_year, optional nameMsgid); PUT edits name/kind/start_year (applies to all years); POST {id}/skips records a per-year exception, DELETE {id}/skips/{year} restores it; POST {id}/active stops/continues the series. saveStateHoliday accepts recurring=true for the same create path. Web collects the anchor in the add-row repeat controls, offers skip-year vs stop-series in a native dialog, exposes rule edit + restore, and drives conversion + one-click 'Add annually' from suggestions. Admin-only surface: the companion never calls these endpoints (B-R8), so mobile is null.",
+   "errorCodes": [
+    "holiday_rule_exists",
+    "holiday_rule_not_found"
+   ],
+   "server": [
+    {
+     "file": "lib/Controller/AdminController.php",
+     "needles": [
+      "createHolidayRule",
+      "updateHolidayRule",
+      "addHolidayRuleSkip",
+      "deleteHolidayRuleSkip",
+      "setHolidayRuleActive",
+      "convertStateHolidayToRule"
+     ]
+    },
+    {
+     "file": "lib/Service/HolidayRuleService.php",
+     "needles": [
+      "createRule",
+      "updateRule",
+      "addSkip",
+      "removeSkip",
+      "setActive",
+      "skippedInstancesForStateYear",
+      "ruleCoveringDate"
+     ]
+    },
+    {
+     "file": "appinfo/routes.php",
+     "needles": [
+      "admin#createHolidayRule",
+      "admin#updateHolidayRule",
+      "admin#addHolidayRuleSkip",
+      "admin#deleteHolidayRuleSkip",
+      "admin#setHolidayRuleActive",
+      "admin#convertStateHolidayToRule"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "js/admin-holidays.js",
+     "needles": [
+      "buildRepeatExtrasRow",
+      "payload.recurring = true",
+      "skipRuleYear",
+      "restoreSkippedInstance",
+      "setRuleActive",
+      "saveRuleChanges",
+      "openRuleRemoveChoiceDialog",
+      "openRuleEditDialog",
+      "convertRowToRule",
+      "addSuggestionAnnually",
+      "holiday-rules"
+     ]
+    },
+    {
+     "file": "templates/admin-holidays.php",
+     "needles": [
+      "Repeat every year",
+      "Only {year}",
+      "Every year (stop the rule)",
+      "Add annually"
+     ]
+    }
+   ],
+   "mobile": null
+  },
+  {
+   "id": "admin-holidays-recurring-dto",
+   "param": "rules / skipped_rules / recurring / rule_id / recurring_exists",
+   "description": "Additive GET payloads (B-R7/B-R8): GET /api/admin/state-holidays returns rules[] + skipped_rules[] alongside holidays; synthesized rule instances carry recurring=true + rule_id + id=null (EC-B13: JS must never treat them as rows); GET /api/admin/state-holidays/suggestions returns anchor metadata + recurring_exists. All fields are additive only — existing consumers keep working. Mobile is null: the companion does not call the admin holiday endpoints.",
+   "errorCodes": [],
+   "server": [
+    {
+     "file": "lib/Controller/AdminController.php",
+     "needles": [
+      "'rules' => $this->holidayRuleService()->listForState($state)",
+      "'skipped_rules' => $this->holidayRuleService()->skippedInstancesForStateYear($state, $year)",
+      "'recurring_exists' => isset($activeRuleKeys[$ruleKey])"
+     ]
+    },
+    {
+     "file": "lib/Service/HolidayService.php",
+     "needles": [
+      "'recurring'",
+      "'rule_id'"
+     ]
+    }
+   ],
+   "web": [
+    {
+     "file": "js/admin-holidays.js",
+     "needles": [
+      "data.rules",
+      "data.skipped_rules",
+      "item.recurring === true",
+      "data-rule-id",
+      "suggestion.recurring_exists"
+     ]
+    }
+   ],
+   "mobile": null
   }
  ]
 }

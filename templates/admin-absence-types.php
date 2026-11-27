@@ -22,6 +22,20 @@ $urlGenerator = $_['urlGenerator'] ?? \OCP\Server::get(\OCP\IURLGenerator::class
 
 $absenceTypes = $_['absenceTypes'] ?? [];
 $localeOptions = $_['localeOptions'] ?? [];
+$leaveSollEffectsEnabled = (bool)($_['leaveSollEffectsEnabled'] ?? true);
+$paidAbsenceCreditEnabled = (bool)($_['paidAbsencePlannedHoursCreditEnabled'] ?? false);
+$overtimeSettingsUrl = (string)($_['overtimeSettingsUrl'] ?? '');
+
+// A-R4: a soll_credit type only credits while at least one paid-credit gate is
+// open — warn inline when the org has flagged types but both gates are off.
+$hasSollCreditTypes = false;
+foreach ($absenceTypes as $catType) {
+	if (!empty($catType['sollCredit'])) {
+		$hasSollCreditTypes = true;
+		break;
+	}
+}
+$showPaidGateWarning = $hasSollCreditTypes && !$leaveSollEffectsEnabled && !$paidAbsenceCreditEnabled;
 ?>
 
 <?php include __DIR__ . '/common/page-start.php'; ?>
@@ -52,6 +66,29 @@ $localeOptions = $_['localeOptions'] ?? [];
 			<p class="form-help form-help--block cat-hint">
 				<?php p($l->t('Employees see these types next to the built-in ones when they request an absence. Deleting a type that is still in use only disables it, so existing records keep working.')); ?>
 			</p>
+			<div id="cat-paid-gate-warning"
+				class="azc-callout azc-callout--warning"
+				role="status"
+				<?php echo $showPaidGateWarning ? '' : 'hidden'; ?>>
+				<p class="azc-callout__text">
+					<strong><?php p($l->t('Types marked "Counts as paid absence" currently have no effect.')); ?></strong>
+					<?php
+					if ($overtimeSettingsUrl !== '') {
+						print_unescaped($l->t(
+							'No absence credit rule is enabled in the organisation settings. Enable %1$sApply leave rules%2$s or %3$sCredit planned hours for approved sick leave%4$s under Overtime & absences settings.',
+							[
+								'<a href="' . \OCP\Util::sanitizeHTML($overtimeSettingsUrl . '#leaveSollEffectsEnabled') . '">',
+								'</a>',
+								'<a href="' . \OCP\Util::sanitizeHTML($overtimeSettingsUrl . '#paidAbsencePlannedHoursCreditEnabled') . '">',
+								'</a>',
+							]
+						));
+					} else {
+						p($l->t('No absence credit rule is enabled in the organisation settings. Enable "Apply leave rules" or "Credit planned hours for approved sick leave" under Overtime & absences settings.'));
+					}
+					?>
+				</p>
+			</div>
 			<div class="table-container" tabindex="0" role="region" aria-label="<?php p($l->t('Custom absence types')); ?>">
 				<table class="table table--hover azc-table--responsive" id="cat-table" role="table" aria-label="<?php p($l->t('Custom absence types')); ?>">
 					<thead>
@@ -72,7 +109,7 @@ $localeOptions = $_['localeOptions'] ?? [];
 							</tr>
 						<?php else: ?>
 							<?php foreach ($absenceTypes as $type): ?>
-								<tr data-type-id="<?php p((string)$type['id']); ?>">
+								<tr data-type-id="<?php p((string)$type['id']); ?>" data-soll-credit="<?php echo !empty($type['sollCredit']) ? '1' : '0'; ?>">
 									<td data-label="<?php p($l->t('Name')); ?>">
 										<span class="cat-name"><?php p($type['resolvedLabel']); ?></span>
 										<span class="cat-code" title="<?php p($l->t('Technical identifier')); ?>"><?php p($type['code']); ?></span>
@@ -155,6 +192,8 @@ $localeOptions = $_['localeOptions'] ?? [];
 		colors: <?php echo json_encode($_['allowedColors'] ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
 		icons: <?php echo json_encode($_['allowedIcons'] ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
 		locales: <?php echo json_encode($localeOptions, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+		leaveSollEffectsEnabled: <?php echo $leaveSollEffectsEnabled ? 'true' : 'false'; ?>,
+		paidAbsenceCreditEnabled: <?php echo $paidAbsenceCreditEnabled ? 'true' : 'false'; ?>,
 	};
 	<?php
 	$catL10n = [
@@ -168,7 +207,7 @@ $localeOptions = $_['localeOptions'] ?? [];
 		'translationsLegend' => $l->t('Translations (optional)'),
 		'translationsHelp' => $l->t('Employees with another language see the translation below; everyone else sees the name above.'),
 		'sollCreditLabel' => $l->t('Counts as paid absence'),
-		'sollCreditHelp' => $l->t('When enabled, planned working hours during this absence count towards the working-time account (like sick leave), provided the paid-absence credit feature is turned on.'),
+		'sollCreditHelp' => $l->t('When enabled, planned working hours during this absence count towards the working-time account (like paid leave), provided "Apply leave rules" or the sick-leave credit is turned on in the organisation settings.'),
 		'maxDaysLabel' => $l->t('Maximum duration in days'),
 		'maxDaysHelp' => $l->t('Longest period employees can request with this type at once.'),
 		'colorLabel' => $l->t('Calendar color'),

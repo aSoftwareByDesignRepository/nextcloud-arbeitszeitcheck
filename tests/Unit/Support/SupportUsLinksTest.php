@@ -134,7 +134,7 @@ final class SupportUsLinksTest extends TestCase {
 	}
 
 	public function testContactConstantsAreStable(): void {
-		$links = new SupportUsLinks('the mobility app');
+		$links = new SupportUsLinks('MobilityCheck');
 		self::assertSame('info@software-by-design.de', $links->contactEmail());
 		self::assertSame('mailto:info@software-by-design.de', $links->contactMailto());
 		self::assertSame('Software by Design GbR', $links->vendorName());

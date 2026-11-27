@@ -497,7 +497,6 @@
 	function highlightSearchOption(index) {
 		const options = getSearchOptions();
 		options.forEach((opt, i) => {
-			opt.setAttribute('aria-selected', i === index ? 'true' : 'false');
 			opt.classList.toggle('is-active', i === index);
 		});
 		const active = options[index];
@@ -533,27 +532,23 @@
 				li.dataset.userId = uid;
 				li.className = 'azc-seat-search-results__option';
 
-				const label = document.createElement('label');
-				label.className = 'azc-seat-search-results__label';
-				const cb = document.createElement('input');
-				cb.type = 'checkbox';
-				cb.className = 'azc-seat-search-results__check';
-				cb.checked = pendingSeatSelection.has(uid);
-				cb.setAttribute('aria-label', display + ' (' + uid + ')');
-				cb.addEventListener('change', () => {
-					togglePendingSeat({ id: uid, userId: uid, displayName: display }, cb.checked);
-					li.setAttribute('aria-selected', cb.checked ? 'true' : 'false');
-				});
+				const row = document.createElement('span');
+				row.className = 'azc-seat-search-results__label';
+				const check = document.createElement('span');
+				check.className = 'azc-seat-search-results__check';
+				check.setAttribute('aria-hidden', 'true');
 				const text = document.createElement('span');
 				text.textContent = display + ' (' + uid + ')';
-				label.appendChild(cb);
-				label.appendChild(text);
-				li.appendChild(label);
+				row.appendChild(check);
+				row.appendChild(text);
+				li.appendChild(row);
 				li.addEventListener('mousedown', (e) => {
-					// Keep focus in the search input; toggle via checkbox/label.
-					if (e.target !== cb) {
-						e.preventDefault();
-					}
+					e.preventDefault();
+				});
+				li.addEventListener('click', () => {
+					const checked = !pendingSeatSelection.has(uid);
+					togglePendingSeat({ id: uid, userId: uid, displayName: display }, checked);
+					li.setAttribute('aria-selected', checked ? 'true' : 'false');
 				});
 				searchResults.appendChild(li);
 			});
